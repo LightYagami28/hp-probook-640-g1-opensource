@@ -1,0 +1,64 @@
+CPU: ID 0x306c3, Processor Type 0x0, Family 0x6, Model 0x3c, Stepping 0x3
+Northbridge: 8086:0c04 (4th generation (Haswell family) Core Processor (Mobile))
+Southbridge: 8086:8c4b (HM87)
+IGD: 8086:0416 (Intel(R) HD 4600 Graphics)
+
+========== ACPI/PMC =========
+
+
+========== ABASE/PMBASE =========
+
+PMBASE = 0x1800 (IO)
+
+pmbase+0x0000: 0x0001     (PM1_STS)
+pmbase+0x0002: 0x0100     (PM1_EN)
+pmbase+0x0004: 0x00000001 (PM1_CNT)
+pmbase+0x0008: 0x00fbad66 (PM1_TMR)
+pmbase+0x000c: 0x00000000 (RESERVED)
+pmbase+0x0010: 0x00000000 (RESERVED)
+pmbase+0x0014: 0x00000000 (RESERVED)
+pmbase+0x0018: 0x00000000 (RESERVED)
+pmbase+0x001c: 0x00000000 (RESERVED)
+pmbase+0x0020: 0x45970000 (GPE0_STS)
+               0x5f000000
+pmbase+0x0028: 0x20480046 (GPE0_EN)
+               0x00000000
+pmbase+0x0030: 0x00002033 (SMI_EN)
+pmbase+0x0034: 0x00004900 (SMI_STS)
+pmbase+0x0038: 0x0002     (ALT_GP_SMI_EN)
+pmbase+0x003a: 0x45dd     (ALT_GP_SMI_STS)
+pmbase+0x003c: 0x00       (UPRWC)
+pmbase+0x003d: 0x01       (RESERVED)
+pmbase+0x003e: 0x0000     (RESERVED)
+pmbase+0x0040: 0x0000     (RESERVED)
+pmbase+0x0042: 0x00       (GPE_CNTL)
+pmbase+0x0043: 0x00       (RESERVED)
+pmbase+0x0044: 0x13c0     (DEVACT_STS)
+pmbase+0x0046: 0x0000     (RESERVED)
+pmbase+0x0048: 0x00000000 (RESERVED)
+pmbase+0x004c: 0x00000000 (RESERVED)
+pmbase+0x0050: 0x00       (PM2_CNT)
+pmbase+0x0051: 0x00       (RESERVED)
+pmbase+0x0052: 0x0000     (RESERVED)
+pmbase+0x0054: 0x00002000 (RESERVED)
+pmbase+0x0058: 0x00000000 (RESERVED)
+pmbase+0x005c: 0x0000     (ALT_GPI_SMI_EN2)
+pmbase+0x005e: 0x00ff     (ALT_GPI_SMI_STS2)
+pmbase+0x0060: 0x0004     (TCO_RLD)
+pmbase+0x0062: 0x00       (TCO_DAT_IN)
+pmbase+0x0063: 0x00       (TCO_DAT_OUT)
+pmbase+0x0064: 0x0000     (TCO1_STS)
+pmbase+0x0066: 0x0001     (TCO2_STS)
+pmbase+0x0068: 0x1800     (TCO1_CNT)
+pmbase+0x006a: 0x0008     (TCO2_CNT)
+pmbase+0x006c: 0x0000     (TCO_MESSAGE)
+pmbase+0x006e: 0x00       (TCO_WDCNT)
+pmbase+0x006f: 0x00       (RESERVED)
+pmbase+0x0070: 0x03       (SW_IRQ_GEN)
+pmbase+0x0071: 0x00       (RESERVED)
+pmbase+0x0072: 0x0004     (TCO_TMR)
+pmbase+0x0074: 0x00000000 (RESERVED)
+pmbase+0x0078: 0x00000000 (RESERVED)
+pmbase+0x007c: 0x00000000 (RESERVED)
+
+

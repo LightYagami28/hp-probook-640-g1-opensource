@@ -1,0 +1,8 @@
+Category: laptop
+Board URL: https://support.hp.com/us-en/product/hp-probook-640-g1-notebook-pc/5405141
+Flashrom support: y
+Release year: 2013
+ROM package: SOIC-8
+ROM protocol: SPI
+ROM socketed: n
+Clone of: hp/folio_9480m

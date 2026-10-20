@@ -1,0 +1,41 @@
+## SPDX-License-Identifier: GPL-2.0-only
+
+if BOARD_HP_PROBOOK_640_G1
+
+config BOARD_SPECIFIC_OPTIONS
+	def_bool y
+	select AZALIA_USE_LEGACY_VERB_TABLE
+	select BOARD_ROMSIZE_KB_12288
+	select EC_HP_KBC1126
+	select HAVE_ACPI_RESUME
+	select HAVE_ACPI_TABLES
+	select INTEL_GMA_HAVE_VBT
+	select MAINBOARD_HAS_LIBGFXINIT
+	select NORTHBRIDGE_INTEL_HASWELL
+	select SERIRQ_CONTINUOUS_MODE
+	select SOUTHBRIDGE_INTEL_LYNXPOINT
+	select SYSTEM_TYPE_LAPTOP
+
+config MAINBOARD_DIR
+	default "hp/probook_640_g1"
+
+config MAINBOARD_PART_NUMBER
+	default "HP ProBook 640 G1"
+
+config VGA_BIOS_ID
+	string
+	default "8086,0416"
+
+config USBDEBUG_HCD_INDEX
+	int
+	default 1
+
+config EC_HP_KBC1126_ECFW_IN_CBFS
+	bool
+	default n
+
+config EC_HP_KBC1126_GPE
+	hex
+	default 0x16
+
+endif
