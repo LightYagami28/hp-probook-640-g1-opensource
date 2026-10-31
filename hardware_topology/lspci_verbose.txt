@@ -1883,7 +1883,7 @@ f0: 00 00 00 00 00 00 00 00 b1 0f 06 08 00 00 00 00
 			Arb:	Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
 			Ctrl:	Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
 			Status:	NegoPending- InProgress-
-	Capabilities: [160 v1] Device Serial Number 00-00-7d-ff-ff-c9-ac-b5
+	Capabilities: [160 v1] Device Serial Number [OSCURATO]
 	Capabilities: [16c v1] Power Budgeting <?>
 	Kernel driver in use: wl
 	Kernel modules: bcma, wl
@@ -2200,7 +2200,7 @@ ff0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 		AERCap:	First Error Pointer: 00, ECRCGenCap+ ECRCGenEn- ECRCChkCap+ ECRCChkEn-
 			MultHdrRecCap- MultHdrRecEn- TLPPfxPres- HdrLogCap-
 		HeaderLog: 00000000 00000000 00000000 00000000
-	Capabilities: [140 v1] Device Serial Number 00-00-00-01-00-4c-e0-00
+	Capabilities: [140 v1] Device Serial Number [OSCURATO]
 	Capabilities: [150 v1] Latency Tolerance Reporting
 		Max snoop latency: 71680ns
 		Max no snoop latency: 71680ns

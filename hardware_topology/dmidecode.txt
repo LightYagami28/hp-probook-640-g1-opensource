@@ -39,8 +39,8 @@ System Information
 	Manufacturer: Hewlett-Packard
 	Product Name: HP ProBook 640 G1
 	Version: A3009DD10303
-	Serial Number: 5CG5051242
-	UUID: 503eeeff-1fb9-11e4-911b-78a37a0180ff
+	Serial Number: [OSCURATO]
+	UUID: [OSCURATO]
 	Wake-up Type: Power Switch
 	SKU Number: D9R53AV
 	Family: 103C_5336AN G=N L=BUS B=HP S=ELI
@@ -50,7 +50,7 @@ Base Board Information
 	Manufacturer: Hewlett-Packard
 	Product Name: 1993
 	Version: KBC Version 16.3C
-	Serial Number: PEBGU00WB8A0WR
+	Serial Number: [OSCURATO]
 	Asset Tag: Not Specified
 	Features:
 		Board is a hosting board
@@ -66,7 +66,7 @@ Chassis Information
 	Type: Notebook
 	Lock: Not Present
 	Version: Not Specified
-	Serial Number: 5CG5051242
+	Serial Number: [OSCURATO]
 	Asset Tag:  
 	Boot-up State: Safe
 	Power Supply State: Safe
@@ -328,7 +328,7 @@ Memory Device
 	Type Detail: Synchronous
 	Speed: 1600 MT/s
 	Manufacturer: Samsung
-	Serial Number: 18E80482
+	Serial Number: [OSCURATO]
 	Asset Tag: 9876543210
 	Part Number: M471B1G73QH0-YK0  
 	Rank: Unknown

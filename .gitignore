@@ -1,0 +1,6 @@
+# Dump e blob proprietari: tenerli solo in locale (vedi NOTICE.md)
+*.bin
+*.rom
+*.vbt
+*.dat
+dump*.bin
