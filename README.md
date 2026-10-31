@@ -40,15 +40,12 @@ Tutti i componenti proprietari, le mappature hardware, i registri del chipset, i
 │   ├── bootblock.c               # Configurazione bootblock
 │   ├── acpi_tables.c             # Riempimento GNVS ACPI
 │   ├── dsdt.asl                  # DSDT master ASL Coreboot
-│   ├── data.vbt                  # Video BIOS Table Intel estratto direttamente dal driver i915
+│   ├── (data.vbt)                # Video BIOS Table Intel: NON inclusa, da estrarre in locale (vedi NOTICE.md)
 │   └── acpi/                     # Sotto-tabelle ACPI (ec.asl, platform.asl, superio.asl)
 │
 ├── firmware_dump/                 # Dump fisici estratti dal chip SPI da 16 MB
-│   ├── flash_descriptor.bin      # Descrittore Intel originale (4 KB, protetto in scrittura)
-│   ├── flash_descriptor_unlocked.bin # Descrittore Intel 100% SBLOCCATO (Master RW mask 0xFFFF)
-│   ├── gbe_region.bin            # Regione GbE Intel (8 KB, configurazione LAN e MAC)
-│   ├── bios_region.bin           # Immagine completa BIOS UEFI HP (8 MB)
-│   └── DESCRIPTOR_ANALYSIS.md    # Analisi tecnica dettagliata delle regioni SPI e permessi
+│   └── DESCRIPTOR_ANALYSIS.md    # Analisi tecnica delle regioni SPI e permessi
+│                                 # (i file .bin NON sono inclusi: vedi NOTICE.md)
 │
 ├── acpi/                          # Tabelle ACPI del BIOS OEM decompilate in ASL (.dsl)
 │   ├── dsdt.dsl                  # DSDT completo (1.041.309 byte, oltre 15.000 righe di ASL)
@@ -103,5 +100,17 @@ Il binario risultante `build/coreboot.rom` conterrà il payload (es. SeaBIOS, Ti
 
 ## 🛡️ Sicurezza Hardware e Flashing (Safe Coding)
 - **Zero Rischio Attuale**: Nessuna scrittura distruttiva è stata eseguita sulla memoria non volatile del laptop.
-- **Preparazione Completa**: Tutti i dump necessari al ripristino o alla compilazione sono al sicuro in questo repository.
+- **Backup in locale**: i dump necessari al ripristino (BIOS, descrittore, GbE) e la VBT vanno conservati **solo in locale**, fuori da git: non sono più pubblicati in questo repository (vedi [`NOTICE.md`](NOTICE.md)).
 - **Prossimo Passo Hardware**: Quando vorrai installare Coreboot sulla scheda madre fisica, sarà sufficiente utilizzare un programmatore esterno da pochi euro (es. CH341A con clip SOIC-8) per eseguire il primo flash senza alcun rischio di brick, come descritto in [`security_and_flashing/FLASHING_GUIDE.md`](security_and_flashing/FLASHING_GUIDE.md).
+
+---
+
+## 📦 File da estrarre in locale
+Per compilare e per il ripristino servono file proprietari che **non** sono distribuiti qui:
+- `data.vbt`: estrarla dal proprio sistema (es. `sudo cat /sys/kernel/debug/dri/0/i915_vbt > data.vbt`) e copiarla in `src/mainboard/hp/probook_640_g1/` nell'albero coreboot.
+- Dump della flash SPI (`flashrom -p ch341a_spi -r dump1.bin`, vedi la guida) e regioni estratte con `ifdtool -x`: da tenere in un backup privato.
+
+## ⚖️ Licenza
+- Port coreboot (`coreboot/`): **GPL-2.0-only**, testo in [`LICENSE`](LICENSE).
+- Dump hardware e tabelle ACPI decompilate: non coperti dalla GPL, diritti dei rispettivi titolari; seriali e UUID oscurati.
+- Dettagli, file esclusi e marchi: [`NOTICE.md`](NOTICE.md).
