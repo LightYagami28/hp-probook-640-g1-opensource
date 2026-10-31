@@ -50,7 +50,6 @@ Tutti i componenti proprietari, le mappature hardware, i registri del chipset, i
 ├── acpi/                          # Tabelle ACPI del BIOS OEM decompilate in ASL (.dsl)
 │   ├── dsdt.dsl                  # DSDT completo (1.041.309 byte, oltre 15.000 righe di ASL)
 │   ├── ssdt1.dsl - ssdt9.dsl     # Tutte le 9 tabelle SSDT secondarie (SpeedStep, C-States, ecc.)
-│   └── *.dat                     # File binari estratti da ACPI
 │
 ├── hardware_topology/             # Mappe registri e architettura hardware
 │   ├── lspci_verbose.txt         # Dump esaustivo registri di configurazione PCI (spazi di tutti i device)
@@ -68,12 +67,13 @@ Tutti i componenti proprietari, le mappature hardware, i registri del chipset, i
 
 ## 🚀 Come Compilare Coreboot per HP ProBook 640 G1
 
-Il porting è già predisposto nella directory `coreboot/` e compatibile con l'albero master di Coreboot.
+Il porting è nella directory `coreboot/`, scritto per l'albero di Coreboot. **Non è stato ancora compilato né provato su hardware con coreboot 26.09**: vedi i limiti in [`SPEC.md`](SPEC.md).
 
 ### 1. Clonare Coreboot
 ```bash
 git clone https://review.coreboot.org/coreboot.git
 cd coreboot
+git checkout 26.09   # ultima release verificata il 2026-10-31
 ```
 
 ### 2. Installare il port della mainboard
@@ -109,6 +109,14 @@ Il binario risultante `build/coreboot.rom` conterrà il payload (es. SeaBIOS, Ti
 Per compilare e per il ripristino servono file proprietari che **non** sono distribuiti qui:
 - `data.vbt`: estrarla dal proprio sistema (es. `sudo cat /sys/kernel/debug/dri/0/i915_vbt > data.vbt`) e copiarla in `src/mainboard/hp/probook_640_g1/` nell'albero coreboot.
 - Dump della flash SPI (`flashrom -p ch341a_spi -r dump1.bin`, vedi la guida) e regioni estratte con `ifdtool -x`: da tenere in un backup privato.
+
+## 📚 Documentazione
+- [`SPEC.md`](SPEC.md): specifica, stack con versioni, limiti, roadmap.
+- [`docs/architettura.md`](docs/architettura.md), [`docs/sviluppo.md`](docs/sviluppo.md), [`docs/sicurezza.md`](docs/sicurezza.md).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), [`CHANGELOG.md`](CHANGELOG.md).
+
+## 🧰 Versioni di riferimento (2026-10-31)
+coreboot 26.09 (crossgcc: GCC 15.2.0, binutils 2.46.1, IASL 20251212), flashrom 1.8.0. CI: markdownlint, lychee, gitleaks con azioni fissate per SHA.
 
 ## ⚖️ Licenza
 - Port coreboot (`coreboot/`): **GPL-2.0-only**, testo in [`LICENSE`](LICENSE).
