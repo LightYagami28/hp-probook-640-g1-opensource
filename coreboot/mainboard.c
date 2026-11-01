@@ -13,8 +13,9 @@ static void mainboard_init(struct device *dev)
 
 	/* Replay the EC dump captured on the original firmware (all zeros). */
 	printk(BIOS_DEBUG, "Replaying EC dump ...");
-	for (i = 0; i < EC_REGISTER_COUNT; i++)
+	for (i = 0; i < EC_REGISTER_COUNT; i++) {
 		ec_write(i, 0x00);
+	}
 	printk(BIOS_DEBUG, "done\n");
 
 	pc_keyboard_init(NO_AUX_DEVICE);
