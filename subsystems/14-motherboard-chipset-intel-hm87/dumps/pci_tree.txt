@@ -1,0 +1,15 @@
+-[0000:00]-+-00.0  Intel Corporation Xeon E3-1200 v3/4th Gen Core Processor DRAM Controller
+           +-02.0  Intel Corporation 4th Gen Core Processor Integrated Graphics Controller
+           +-03.0  Intel Corporation Xeon E3-1200 v3/4th Gen Core Processor HD Audio Controller
+           +-14.0  Intel Corporation 8 Series/C220 Series Chipset Family USB xHCI
+           +-16.0  Intel Corporation 8 Series/C220 Series Chipset Family MEI Controller #1
+           +-19.0  Intel Corporation Ethernet Connection I217-V
+           +-1a.0  Intel Corporation 8 Series/C220 Series Chipset Family USB EHCI #2
+           +-1b.0  Intel Corporation 8 Series/C220/C740 Series Chipset High Definition Audio Controller
+           +-1c.0-[01]--
+           +-1c.6-[02]----00.0  Broadcom Inc. and subsidiaries BCM43228 802.11a/b/g/n
+           +-1c.7-[03]----00.0  Realtek Semiconductor Co., Ltd. RTS5227 PCI Express Card Reader
+           +-1d.0  Intel Corporation 8 Series/C220 Series Chipset Family USB EHCI #1
+           +-1f.0  Intel Corporation HM87 Express LPC Controller
+           +-1f.2  Intel Corporation 8 Series/C220 Series Chipset Family 6-port SATA Controller 1 [AHCI mode]
+           \-1f.3  Intel Corporation 8 Series/C220 Series Chipset Family SMBus Controller
