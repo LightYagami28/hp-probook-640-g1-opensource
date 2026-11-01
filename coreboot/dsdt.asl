@@ -21,7 +21,7 @@ DefinitionBlock(
 	Device (\_SB.PCI0)
 	{
 		#include <northbridge/intel/haswell/acpi/hostbridge.asl>
-	/* FIXME: remove this if the board doesn't have backlight. */
+		/* Default brightness levels. */
 		#include <drivers/intel/gma/acpi/default_brightness_levels.asl>
 		#include <southbridge/intel/lynxpoint/acpi/pch.asl>
 	}

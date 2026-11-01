@@ -2,7 +2,7 @@
 
 #include <southbridge/intel/lynxpoint/pch.h>
 
-/* FIXME: remove this if not needed */
+/* Hook required by the Lynx Point bootblock; nothing to configure. */
 void mainboard_config_superio(void)
 {
 }
