@@ -4,3 +4,10 @@
 *.vbt
 *.dat
 dump*.bin
+
+# Segreti locali
+.env
+.env.*
+!.env.example
+*.pem
+*.key
