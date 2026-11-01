@@ -3,18 +3,18 @@
 #include <northbridge/intel/haswell/haswell.h>
 #include <southbridge/intel/lynxpoint/pch.h>
 
-/* FIXME: remove this if not needed */
+/* Hook required by the Lynx Point romstage; nothing to configure. */
 void mainboard_config_rcba(void)
 {
 }
 
-/* FIXME: called after romstage_common, remove it if not used */
+/* Called after romstage_common; nothing to do on this board. */
 void mb_late_romstage_setup(void)
 {
 }
 
 const struct usb2_port_config mainboard_usb2_ports[MAX_USB2_PORTS] = {
-	/* FIXME: Length and Location are computed from IOBP values, may be inaccurate */
+	/* Length and Location are computed from IOBP values, may be inaccurate */
 	/* Length, Enable, OCn#, Location */
 	{ 0x0040, 1, 0, USB_PORT_BACK_PANEL },
 	{ 0x0040, 1, 0, USB_PORT_BACK_PANEL },

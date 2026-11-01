@@ -1,6 +1,7 @@
 # Analisi Intel Flash Descriptor & Mappatura SPI Flash
 
 ## Chip SPI Flash
+
 - **Capacità totale**: 16 MB (16.384 KB / 134.217.728 bit)
 - **Controller Host**: Intel Lynx Point PCH (Series 8) SPI Controller
 - **Frequenza SPI**: 50 MHz (Fast Read Dual Output supportato)
@@ -8,16 +9,27 @@
 
 ## Mappa delle Regioni (Intel Flash Descriptor Layout)
 
-| Regione | Nome | Indirizzo Iniziale | Indirizzo Finale | Dimensione | Permessi Host CPU (Originale) | Permessi Host CPU (Sbloccato) |
-|---|---|---|---|---|---|---|
-| **0** | **Flash Descriptor (IFD)** | `0x00000000` | `0x00000FFF` | 4 KB | Read: **SI** / Write: **NO** | Read: **SI** / Write: **SI** |
-| **3** | **GbE (Gigabit Ethernet)** | `0x00001000` | `0x00002FFF` | 8 KB | Read: **SI** / Write: **SI** | Read: **SI** / Write: **SI** |
-| **2** | **Intel ME (Management Engine)** | `0x00003000` | `0x007FFFFF` | 8.180 KB (~8 MB) | Read: **NO** / Write: **NO** | Read: **SI** / Write: **SI** |
-| **1** | **BIOS Region (UEFI/Coreboot)** | `0x00800000` | `0x00FFFFFF` | 8.192 KB (8.0 MB) | Read: **SI** / Write: **SI** | Read: **SI** / Write: **SI** |
+- **0**: Nome **Flash Descriptor (IFD)**; Indirizzo Iniziale `0x00000000`;
+  Indirizzo Finale `0x00000FFF`; Dimensione 4 KB; Permessi Host CPU (Originale)
+  Read: **SI** / Write: **NO**; Permessi Host CPU (Sbloccato) Read: **SI** /
+  Write: **SI**
+- **3**: Nome **GbE (Gigabit Ethernet)**; Indirizzo Iniziale `0x00001000`;
+  Indirizzo Finale `0x00002FFF`; Dimensione 8 KB; Permessi Host CPU (Originale)
+  Read: **SI** / Write: **SI**; Permessi Host CPU (Sbloccato) Read: **SI** /
+  Write: **SI**
+- **2**: Nome **Intel ME (Management Engine)**; Indirizzo Iniziale `0x00003000`;
+  Indirizzo Finale `0x007FFFFF`; Dimensione 8.180 KB (~8 MB); Permessi Host CPU
+  (Originale) Read: **NO** / Write: **NO**; Permessi Host CPU (Sbloccato) Read:
+  **SI** / Write: **SI**
+- **1**: Nome **BIOS Region (UEFI/Coreboot)**; Indirizzo Iniziale `0x00800000`;
+  Indirizzo Finale `0x00FFFFFF`; Dimensione 8.192 KB (8.0 MB); Permessi Host CPU
+  (Originale) Read: **SI** / Write: **SI**; Permessi Host CPU (Sbloccato) Read:
+  **SI** / Write: **SI**
 
 ## Tabella Flash Masters & Maschere di Accesso
 
 ### Originale HP (Lock di fabbrica)
+
 ```text
 FLMSTR1 (Host CPU / BIOS): 0x0a0b0000
   Flash Descriptor Access: Read: SI  | Write: NO
@@ -36,7 +48,9 @@ FLMSTR3 (GbE Controller): 0x08080118
 ```
 
 ### Sbloccato (`flash_descriptor_unlocked.bin`)
+
 Generato con `ifdtool -u`:
+
 ```text
 FLMSTR1 (Host CPU / BIOS): 0xffff0000 (100% UNLOCKED)
   Flash Descriptor Access: Read: SI  | Write: SI
@@ -44,4 +58,6 @@ FLMSTR1 (Host CPU / BIOS): 0xffff0000 (100% UNLOCKED)
   Intel ME Region Access:  Read: SI  | Write: SI
   GbE Region Access:       Read: SI  | Write: SI
 ```
-Con questo descrittore sbloccato, l'host CPU può leggere e scrivere l'intera memoria SPI da 16 MB.
+
+Con questo descrittore sbloccato, l'host CPU può leggere e scrivere l'intera
+memoria SPI da 16 MB.

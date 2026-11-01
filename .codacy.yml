@@ -1,0 +1,5 @@
+---
+exclude_paths:
+  # Output generato dal dispositivo (ACPI decompilato, dump hardware)
+  - "acpi/**"
+  - "hardware_topology/**"
