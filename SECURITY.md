@@ -9,7 +9,8 @@ di GitHub ("Security" > "Report a vulnerability") sul repository.
 
 ## Cosa non va mai committato
 
-- Dump della flash SPI (Serial Peripheral Interface), regioni IFD/ME/GbE,
+- Dump della flash SPI (Serial Peripheral Interface), regioni Intel Flash
+  Descriptor (IFD), Management Engine (ME) e Gigabit Ethernet (GbE),
   `data.vbt`, `*.rom`: restano solo in
   locale (vedi [`NOTICE.md`](NOTICE.md)).
 - Seriali, UUID, MAC e numeri di serie dei dispositivi PCI (Peripheral Component
