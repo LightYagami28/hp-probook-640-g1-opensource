@@ -15,10 +15,12 @@ enrolled sub-template is >= 40. Genuine swipes of the same finger typically scor
 different fingers < 15. No sensor is touched unless --capture is used.
 """
 import os, sys, re, glob, socket, struct, subprocess, tempfile, threading, time
+from pathlib import Path
 
 THRESHOLD = 40
 MIN_ROWS = 80
 CAPTURE = "/usr/lib/vfs495-fprint/capture.py"
+CAPTURE_ROOT = Path("/run/vfs495-fprint").resolve()
 
 # --- must happen before libfprint is loaded: private socket + score debug output ---
 _tmp = tempfile.mkdtemp(prefix="vfs495-match-")
@@ -43,7 +45,8 @@ from gi.repository import FPrint, GLib  # noqa: E402
 
 
 def read_pgm(p):
-    with open(p, "rb") as f:
+    path = Path(p).expanduser().resolve(strict=True)
+    with path.open("rb") as f:
         if f.readline().strip() != b"P5": raise SystemExit(f"{p}: not a binary PGM (P5)")
         tok = []
         while len(tok) < 3:
@@ -124,7 +127,7 @@ def install_template(dev, files, imgs):
     path = d + "/7"                               # 7 = right index finger in fprintd's file store
     if os.path.exists(path): os.replace(path, path + ".bak")
     with open(path, "wb") as fh: fh.write(data)
-    os.chmod(path, 0o644)
+    os.chmod(path, 0o600)
     out(f"enrolled right index finger for {user} from {len(files)} scan(s) -> {path}")
     out("check of the new template against those scans:")
     for f in files:
@@ -156,19 +159,22 @@ def capture(n, d):
     if os.geteuid() != 0: raise SystemExit("--capture needs root: sudo vfs495-match --capture N")
     if not os.path.exists("/var/lib/vfs495-fprint/validity-sensor-unlocked"):
         raise SystemExit("HP driver not installed; run: sudo vfs495-setup-hp-driver")
+    directory = Path(d).expanduser().resolve()
+    if not directory.is_relative_to(CAPTURE_ROOT):
+        raise SystemExit(f"capture directory must be below {CAPTURE_ROOT}")
     subprocess.run(["systemctl", "stop", "vfs495-bridge"], stderr=subprocess.DEVNULL)
-    os.makedirs(d, exist_ok=True); files = []; tiny = []
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True); files = []; tiny = []
     try:
         for i in range(1, n + 1):
-            p = f"{d}/swipe-{i}.pgm"
+            p = directory / f"swipe-{i}.pgm"
             out(f"[{i}/{n}] get ready... "); time.sleep(1.0)
             out(f"[{i}/{n}] SWIPE NOW (slowly, whole fingertip, one steady motion)")
-            r = subprocess.run([sys.executable, CAPTURE, p], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            r = subprocess.run([sys.executable, CAPTURE, str(p)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if r.returncode == 0:
                 w, h, _ = read_pgm(p)
                 if h < MIN_ROWS:
                     out(f"[{i}/{n}] tiny scan {w}x{h}: swipe too short/fast, or the sensor is stuck (see below)")
-                    tiny.append(h); os.unlink(p)
+                    tiny.append(h); p.unlink()
                 else:
                     out(f"[{i}/{n}] captured {w}x{h} -> {p}"); files.append(p)
             else:
@@ -204,11 +210,11 @@ def main(argv):
         files = args
     if not files: raise SystemExit("no images given")
     imgs = {f: read_pgm(f) for f in files}
-    for f in list(files):
+    for f in tuple(files):
         if imgs[f][1] < MIN_ROWS:
             err(f"{f}: only {imgs[f][1]} rows, not a usable scan (skipped)"); files.remove(f)
     if not files: raise SystemExit("no usable images")
-    ctx, dev = open_device()
+    _, dev = open_device()
     out(f"matcher: libfprint {dev.get_driver()} (NBIS bozorth3), threshold {THRESHOLD}\n")
     if enroll:
         install_template(dev, files, imgs)

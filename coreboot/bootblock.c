@@ -5,4 +5,5 @@
 /* Hook required by the Lynx Point bootblock; nothing to configure. */
 void mainboard_config_superio(void)
 {
+	/* This board has no Super I/O settings to apply at bootblock time. */
 }
