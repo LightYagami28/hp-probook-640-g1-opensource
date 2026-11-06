@@ -44,6 +44,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Unit tests with coverage
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install pytest pytest-cov
+          .venv/bin/pytest --cov=subsystems/02-fingerprint-vfs495/scripts \
+            --cov-report=xml:coverage.xml --cov-report=term-missing
       # Il segreto SONAR_TOKEN manca nelle PR da fork: l'analisi si salta.
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''

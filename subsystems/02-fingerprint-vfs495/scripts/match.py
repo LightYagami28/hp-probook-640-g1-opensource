@@ -46,15 +46,15 @@ from gi.repository import FPrint, GLib  # noqa: E402
 
 def read_pgm(p):
     path = Path(p).expanduser().resolve(strict=True)
-    with path.open("rb") as f:
-        if f.readline().strip() != b"P5": raise SystemExit(f"{p}: not a binary PGM (P5)")
+    with path.open("rb") as handle:
+        if handle.readline().strip() != b"P5": raise SystemExit(f"{p}: not a binary PGM (P5)")
         tok = []
         while len(tok) < 3:
-            line = f.readline()
+            line = handle.readline()
             if line.startswith(b"#"): continue
             tok += line.split()
-        w, h = int(tok[0]), int(tok[1])
-        return w, h, f.read(w * h)
+        width, height = int(tok[0]), int(tok[1])
+        return width, height, handle.read(width * height)
 
 
 _conn = None
@@ -169,8 +169,17 @@ def capture(n, d):
             p = directory / f"swipe-{i}.pgm"
             out(f"[{i}/{n}] get ready... "); time.sleep(1.0)
             out(f"[{i}/{n}] SWIPE NOW (slowly, whole fingertip, one steady motion)")
-            r = subprocess.run([sys.executable, CAPTURE, str(p)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if r.returncode == 0:
+            completed = subprocess.run(  # nosec B603
+                [
+                    "/usr/bin/python3",
+                    "/usr/lib/vfs495-fprint/capture.py",
+                    os.fspath(p),
+                ],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if completed.returncode == 0:
                 w, h, _ = read_pgm(p)
                 if h < MIN_ROWS:
                     out(f"[{i}/{n}] tiny scan {w}x{h}: swipe too short/fast, or the sensor is stuck (see below)")

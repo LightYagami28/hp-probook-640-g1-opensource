@@ -45,10 +45,12 @@ def kill_capture():
         subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], stderr=subprocess.DEVNULL)
 
 def capture_is_current(gen):
+    """Return whether this generation is still the capture fprintd wants."""
     return state["gen"] == gen and state["wanted"]
 
 
 def deliver_capture(out, last, gen, started):
+    """Capture once and deliver the scan when it is still wanted and usable."""
     if not run_capture(out):
         return False
     if not capture_is_current(gen):
@@ -62,9 +64,10 @@ def deliver_capture(out, last, gen, started):
         return False
     try:
         deliver(*img)
-        log(f"delivered scan {img[0]}x{img[1]} after {time.monotonic()-started:.1f}s")
-    except OSError as e:
-        log(f"deliver failed: {e}")
+        elapsed = round(time.monotonic() - started, 1)
+        log(f"delivered scan {img[0]}x{img[1]} after {elapsed}s")
+    except OSError as error:
+        log(f"deliver failed: {error}")
     return True
 
 
@@ -75,7 +78,7 @@ def capture_and_deliver(gen):
         for attempt in range(2):
             if deliver_capture(out, last, gen, time.monotonic()):
                 return
-            log("no usable finger scan" + (", retrying" if attempt == 0 else " (give up)"))
+            log("no usable finger scan" + (", retrying" if not attempt else " (give up)"))
     finally:
         try: os.unlink(out)
         except OSError: pass
