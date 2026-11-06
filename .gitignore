@@ -5,6 +5,14 @@
 *.dat
 dump*.bin
 
+# Test e ambienti locali
+.venv/
+.pytest_cache/
+.coverage
+coverage.xml
+__pycache__/
+*.pyc
+
 # Segreti locali
 .env
 .env.*

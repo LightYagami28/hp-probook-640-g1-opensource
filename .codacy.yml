@@ -3,3 +3,5 @@ exclude_paths:
   # Output generato dal dispositivo (ACPI decompilato, dump hardware)
   - "acpi/**"
   - "hardware_topology/**"
+  # I test usano assert e nomi locali; non entrano nel quality gate del prodotto.
+  - "tests/**"

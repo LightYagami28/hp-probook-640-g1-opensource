@@ -86,23 +86,39 @@ security_and_flashing/  Guida sicurezza hardware e procedura flash
 
 ## 🧩 Sottosistemi Hardware & Reverse Engineering (`subsystems/`)
 
-Ogni singolo componente hardware del portatile è analizzato, decodificato e documentato nella propria cartella:
+Ogni singolo componente hardware del portatile è analizzato, decodificato e
+documentato nella propria cartella:
 
-- [**`01-firmware-bios-coreboot/`**](subsystems/01-firmware-bios-coreboot/): Analisi descrittore IFD sbloccato, limiti PRx/SMM e guida flashing.
-- [**`02-fingerprint-vfs495/`**](subsystems/02-fingerprint-vfs495/): Reverse engineering protocollo Validity, chiavi RSA, patch e bridge fprintd.
-- [**`03-wifi-broadcom-bcm43228/`**](subsystems/03-wifi-broadcom-bcm43228/): Modulo kernel `wl`, risoluzione conflitti e blacklist driver legacy.
-- [**`04-bluetooth-bcm20702a0/`**](subsystems/04-bluetooth-bcm20702a0/): Firmware patch RAM HCD (Build 1765) e configurazione BlueZ.
-- [**`05-audio-idt92hd91bxx/`**](subsystems/05-audio-idt92hd91bxx/): Nodi Azalia, tabella verb, jack sensing e routing altoparlanti.
-- [**`06-graphics-intel-hd4600/`**](subsystems/06-graphics-intel-hd4600/): Timing eDP dal VBT, inizializzazione libgfxinit e VA-API.
-- [**`07-touchpad-trackpoint/`**](subsystems/07-touchpad-trackpoint/): Multiplexing EC i8042, gesture multi-touch e configurazione libinput.
-- [**`08-embedded-controller-smsc-kbc1126/`**](subsystems/08-embedded-controller-smsc-kbc1126/): Mappa registri ECRM, porte `0x62`/`0x66`, mailbox `0x0200` ed eventi `_Qxx`.
-- [**`09-thermal-cooling/`**](subsystems/09-thermal-cooling/): 8 zone termiche ACPI, trip point (90°C/100°C) e PWM ventola.
-- [**`10-battery-power-management/`**](subsystems/10-battery-power-management/): Specifica SBS 1.1, handshake Smart AC su linea 1-Wire e ACPI `BAT0`.
-- [**`11-storage-hdd-odd-accelerometer/`**](subsystems/11-storage-hdd-odd-accelerometer/): Controller SATA AHCI, unità ottica e sensore anti-caduta LIS3LV02DL.
-- [**`12-card-reader-realtek-rts5227/`**](subsystems/12-card-reader-realtek-rts5227/): Controller PCIe Realtek, bus UHS-I SDR104 e autosuspend ASPM.
-- [**`13-webcam-chicony-hd/`**](subsystems/13-webcam-chicony-hd/): Controller UVC 720p 30 FPS MJPEG/YUYV e microfoni digitali array.
-- [**`14-motherboard-chipset-intel-hm87/`**](subsystems/14-motherboard-chipset-intel-hm87/): Topologia PCIe, range decode LPC (`gen1_dec`..`gen4_dec`) e GPIO Set 1-3.
-- [**`15-acpi-tables/`**](subsystems/15-acpi-tables/): Tabelle DSDT e SSDT 1..9 decompilate.
+- [**`01-firmware-bios-coreboot/`**](subsystems/01-firmware-bios-coreboot/):
+  Analisi descrittore IFD sbloccato, limiti PRx/SMM e guida flashing.
+- [**`02-fingerprint-vfs495/`**](subsystems/02-fingerprint-vfs495/): Reverse
+  engineering protocollo Validity, chiavi RSA, patch e bridge fprintd.
+- [**`03-wifi-broadcom-bcm43228/`**](subsystems/03-wifi-broadcom-bcm43228/):
+  Modulo kernel `wl`, risoluzione conflitti e blacklist driver legacy.
+- [**`04-bluetooth-bcm20702a0/`**](subsystems/04-bluetooth-bcm20702a0/):
+  Firmware patch RAM HCD (Build 1765) e configurazione BlueZ.
+- [**`05-audio-idt92hd91bxx/`**](subsystems/05-audio-idt92hd91bxx/): Nodi
+  Azalia, tabella verb, jack sensing e routing altoparlanti.
+- [**`06-graphics-intel-hd4600/`**](subsystems/06-graphics-intel-hd4600/):
+  Timing eDP dal VBT, inizializzazione libgfxinit e VA-API.
+- [**`07-touchpad-trackpoint/`**](subsystems/07-touchpad-trackpoint/):
+  Multiplexing EC i8042, gesture multi-touch e configurazione libinput.
+- [**`08-embedded-controller-smsc-kbc1126/`**](subsystems/08-embedded-controller-smsc-kbc1126/):
+  Mappa registri ECRM, porte `0x62`/`0x66`, mailbox `0x0200` ed eventi `_Qxx`.
+- [**`09-thermal-cooling/`**](subsystems/09-thermal-cooling/): 8 zone termiche
+  ACPI, trip point (90°C/100°C) e PWM ventola.
+- [**`10-battery-power-management/`**](subsystems/10-battery-power-management/):
+  Specifica SBS 1.1, handshake Smart AC su linea 1-Wire e ACPI `BAT0`.
+- [**`11-storage-hdd-odd-accelerometer/`**](subsystems/11-storage-hdd-odd-accelerometer/):
+  Controller SATA AHCI, unità ottica e sensore anti-caduta LIS3LV02DL.
+- [**`12-card-reader-realtek-rts5227/`**](subsystems/12-card-reader-realtek-rts5227/):
+  Controller PCIe Realtek, bus UHS-I SDR104 e autosuspend ASPM.
+- [**`13-webcam-chicony-hd/`**](subsystems/13-webcam-chicony-hd/): Controller
+  UVC 720p 30 FPS MJPEG/YUYV e microfoni digitali array.
+- [**`14-motherboard-chipset-intel-hm87/`**](subsystems/14-motherboard-chipset-intel-hm87/):
+  Topologia PCIe, range decode LPC (`gen1_dec`..`gen4_dec`) e GPIO Set 1-3.
+- [**`15-acpi-tables/`**](subsystems/15-acpi-tables/): Tabelle DSDT e SSDT 1..9
+  decompilate.
 
 ---
 

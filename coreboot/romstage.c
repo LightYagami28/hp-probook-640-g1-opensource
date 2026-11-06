@@ -6,11 +6,13 @@
 /* Hook required by the Lynx Point romstage; nothing to configure. */
 void mainboard_config_rcba(void)
 {
+	/* This board does not require RCBA configuration. */
 }
 
 /* Called after romstage_common; nothing to do on this board. */
 void mb_late_romstage_setup(void)
 {
+	/* No late romstage setup is needed by this mainboard. */
 }
 
 const struct usb2_port_config mainboard_usb2_ports[MAX_USB2_PORTS] = {

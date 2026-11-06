@@ -1,17 +1,24 @@
 # 05 — Sottosistema Audio IDT 92HD91BXX & Intel Haswell HDMI
 
 ## 1. Dati Hardware
-* **Controller HDA**: Intel Corporation 8 Series/C220 Series Chipset High Definition Audio (`8086:8c20`, Subsystem `103c:1993`)
-* **Codec Audio Analogico**: IDT 92HD91BXX (`111d:76e0`, Subsystem `103c:2105`, Rev `0x100303`)
-* **Codec Audio Digitale**: Intel Haswell HDMI Audio (`8086:2807`, Subsystem `8086:0101`)
+
+* **Controller HDA**: Intel Corporation 8 Series/C220 Series Chipset High
+  Definition Audio (`8086:8c20`, Subsystem `103c:1993`)
+* **Codec Audio Analogico**: IDT 92HD91BXX (`111d:76e0`, Subsystem `103c:2105`,
+  Rev `0x100303`)
+* **Codec Audio Digitale**: Intel Haswell HDMI Audio (`8086:2807`, Subsystem
+  `8086:0101`)
 
 ---
 
 ## 2. Reverse Engineering dei Nodi Azalia & Verb Table
-Dall'estrazione dei registri ALSA in [`dumps/codec_idt92hd91bxx.txt`](dumps/codec_idt92hd91bxx.txt) e [`dumps/init_pin_configs.txt`](dumps/init_pin_configs.txt):
+
+Dall'estrazione dei registri ALSA in
+[`dumps/codec_idt92hd91bxx.txt`](dumps/codec_idt92hd91bxx.txt) e
+[`dumps/init_pin_configs.txt`](dumps/init_pin_configs.txt):
 
 | Nodo | Funzione Fisica | Configurazione Pin (`Pin Default`) | Proprietà & Jack Sensing |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **0x0a** | Line Out Posteriore / Dock | `0x21011030` | Jack stereo da 3.5mm sul retro dock |
 | **0x0b** | Cuffie Frontali / Combo Jack | `0x0321101f` | Rilevamento presenza jack (Jack Detect) |
 | **0x0c** | Ingresso Microfono Esterno | `0x03a11020` | Rilevamento jack mic |
@@ -20,7 +27,10 @@ Dall'estrazione dei registri ALSA in [`dumps/codec_idt92hd91bxx.txt`](dumps/code
 | **0x11** | Microfono Digitale Integrato | `0xd5a30140` | Array microfoni interni display |
 
 ### Tabella Verb C per Coreboot (`coreboot/hda_verb.c`)
-I comandi verb di inizializzazione per il firmware sono inclusi nel file `coreboot/hda_verb.c`:
+
+I comandi verb di inizializzazione per il firmware sono inclusi nel file
+`coreboot/hda_verb.c`:
+
 ```c
 const u32 cim_verb_data[] = {
     0x111d76e0,    /* ID Codec IDT */
@@ -43,6 +53,7 @@ const u32 cim_verb_data[] = {
 ---
 
 ## 3. Verifica dello Stato Operativo
+
 ```bash
 # Ispezione schede audio riconosciute dal kernel:
 cat /proc/asound/cards

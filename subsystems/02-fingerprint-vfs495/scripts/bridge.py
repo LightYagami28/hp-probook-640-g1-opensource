@@ -44,26 +44,41 @@ def kill_capture():
         except OSError: pass
         subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], stderr=subprocess.DEVNULL)
 
+def capture_is_current(gen):
+    """Return whether this generation is still the capture fprintd wants."""
+    return state["gen"] == gen and state["wanted"]
+
+
+def deliver_capture(out, last, gen, started):
+    """Capture once and deliver the scan when it is still wanted and usable."""
+    if not run_capture(out):
+        return False
+    if not capture_is_current(gen):
+        log("capture cancelled (fprintd no longer waiting)")
+        return True
+    img = read_pgm(out)
+    os.replace(out, last)
+    if img[1] < MIN_ROWS:
+        log(f"sensor returned a tiny scan ({img[0]}x{img[1]}): swipe too short/fast, or the sensor is in "
+            "its stuck state (then: full power-off, not a reboot)")
+        return False
+    try:
+        deliver(*img)
+        elapsed = round(time.monotonic() - started, 1)
+        log(f"delivered scan {img[0]}x{img[1]} after {elapsed}s")
+    except OSError as error:
+        log(f"deliver failed: {error}")
+    return True
+
+
 def capture_and_deliver(gen):
     os.makedirs(RUN, mode=0o700, exist_ok=True)
     out, last = RUN + "/cap.pgm", RUN + "/last.pgm"
-    t0 = time.monotonic()
     try:
-        for attempt in range(2):                       # a swipe can straddle the window; try twice
-            ok = run_capture(out)
-            if state["gen"] != gen or not state["wanted"]:
-                log("capture cancelled (fprintd no longer waiting)"); return
-            if ok:
-                img = read_pgm(out); os.replace(out, last)
-                if img[1] < MIN_ROWS:
-                    log(f"sensor returned a tiny scan ({img[0]}x{img[1]}): swipe too short/fast, or the sensor is in "
-                        "its stuck state (then: full power-off, not a reboot)"); ok = False
-                else:
-                    try:
-                        deliver(*img); log(f"delivered scan {img[0]}x{img[1]} after {time.monotonic()-t0:.1f}s"); return
-                    except OSError as e:
-                        log(f"deliver failed: {e}"); return
-            if not ok: log("no usable finger scan" + (", retrying" if attempt == 0 else " (give up)"))
+        for attempt in range(2):
+            if deliver_capture(out, last, gen, time.monotonic()):
+                return
+            log("no usable finger scan" + (", retrying" if not attempt else " (give up)"))
     finally:
         try: os.unlink(out)
         except OSError: pass
