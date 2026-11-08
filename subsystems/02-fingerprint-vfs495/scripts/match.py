@@ -44,9 +44,18 @@ gi.require_version("FPrint", "2.0")
 from gi.repository import FPrint, GLib  # noqa: E402
 
 
-def read_pgm(p):
+def input_path(p):
     path = Path(p).expanduser().resolve(strict=True)
-    with path.open("rb") as handle:
+    if not path.is_file(): raise SystemExit(f"{p}: not a regular file")
+    return path
+
+
+def read_input(p):
+    return input_path(p).read_bytes()
+
+
+def read_pgm(p):
+    with input_path(p).open("rb") as handle:
         if handle.readline().strip() != b"P5": raise SystemExit(f"{p}: not a binary PGM (P5)")
         tok = []
         while len(tok) < 3:
@@ -203,20 +212,48 @@ def find_templates():
     return sorted(glob.glob(f"/var/lib/fprint/{user}/virtual_image/0/*"))
 
 
-def main(argv):
-    args = argv[1:]
-    if not args or args[0] in ("-h", "--help"): out(__doc__); return 0
-    template_file = None; files = []; enroll = False
+def parse_args(args):
+    """Returns (files, template_file, enroll, captured) from the command line."""
+    template_file = None; enroll = False
     if args[0] == "--capture":
         n = int(args[1]) if len(args) > 1 else 3
         d = args[2] if len(args) > 2 else "/run/vfs495-fprint/test"
         files = capture(n, d)
         if len(files) < 1: raise SystemExit("no captures to score")
         out("")
-    else:
-        if args[0] == "--template": template_file, args = args[1], args[2:]
-        if args and args[0] == "--enroll": enroll, args = True, args[1:]
-        files = args
+        return files, template_file, enroll, True
+    if args[0] == "--template": template_file, args = args[1], args[2:]
+    if args and args[0] == "--enroll": enroll, args = True, args[1:]
+    return args, template_file, enroll, False
+
+
+def score_templates(dev, files, imgs, templates):
+    for tpath, tdata in templates:
+        try:
+            tmpl = FPrint.Print.deserialize(tdata)
+        except GLib.Error as e:
+            err(f"cannot load template {tpath}: {e.message}"); continue
+        out(f"against enrolled template {tpath} ({FPrint.Finger(tmpl.get_finger()).value_nick}):")
+        for f in files:
+            m, s = verify(dev, tmpl, imgs[f], f); out(f"  {os.path.basename(f):<20} {fmt(m, s)}")
+        out("")
+
+
+def score_cross(dev, files, imgs):
+    out("each image enrolled, verified with every other image:")
+    for a in files:
+        tmpl = enroll_from_image(dev, imgs[a], a)
+        if tmpl is None: continue
+        for b in files:
+            if a == b: continue
+            m, s = verify(dev, tmpl, imgs[b], b)
+            out(f"  enroll {os.path.basename(a):<16} verify {os.path.basename(b):<16} {fmt(m, s)}")
+
+
+def main(argv):
+    args = argv[1:]
+    if not args or args[0] in ("-h", "--help"): out(__doc__); return 0
+    files, template_file, enroll, captured = parse_args(args)
     if not files: raise SystemExit("no images given")
     imgs = {f: read_pgm(f) for f in files}
     for f in tuple(files):
@@ -231,28 +268,11 @@ def main(argv):
         dev.close_sync(None); return 0
 
     templates = []
-    if template_file: templates.append((template_file, open(template_file, "rb").read()))
-    elif argv[1] == "--capture":
-        for t in find_templates(): templates.append((t, open(t, "rb").read()))
-    for tpath, tdata in templates:
-        try:
-            tmpl = FPrint.Print.deserialize(tdata)
-        except GLib.Error as e:
-            err(f"cannot load template {tpath}: {e.message}"); continue
-        out(f"against enrolled template {tpath} ({FPrint.Finger(tmpl.get_finger()).value_nick}):")
-        for f in files:
-            m, s = verify(dev, tmpl, imgs[f], f); out(f"  {os.path.basename(f):<20} {fmt(m, s)}")
-        out("")
-
-    if len(files) >= 2:
-        out("each image enrolled, verified with every other image:")
-        for a in files:
-            tmpl = enroll_from_image(dev, imgs[a], a)
-            if tmpl is None: continue
-            for b in files:
-                if a == b: continue
-                m, s = verify(dev, tmpl, imgs[b], b)
-                out(f"  enroll {os.path.basename(a):<16} verify {os.path.basename(b):<16} {fmt(m, s)}")
+    if template_file: templates.append((template_file, read_input(template_file)))
+    elif captured:
+        for t in find_templates(): templates.append((t, read_input(t)))
+    score_templates(dev, files, imgs, templates)
+    if len(files) >= 2: score_cross(dev, files, imgs)
     if _conn: _conn.close()
     dev.close_sync(None)
     return 0
