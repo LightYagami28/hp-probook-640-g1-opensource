@@ -388,3 +388,36 @@ def test_install_template_uses_private_mode(tmp_path, monkeypatch):
     write_pgm(image, 2, 80)
     module.install_template(MagicMock(), [str(image)], {str(image): (2, 80, b"xx")})
     assert ("/var/lib/fprint/vfs-user/virtual_image/0/7", 0o600) in modes
+
+
+def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
+    module = match()
+    img = tmp_path / "a.pgm"
+    img2 = tmp_path / "b.pgm"
+    write_pgm(img, 2, 80)
+    write_pgm(img2, 2, 80)
+    tmpl = tmp_path / "tmpl"
+    tmpl.write_bytes(b"x")
+    device = MagicMock()
+    monkeypatch.setattr(module, "open_device", lambda: (None, device))
+    monkeypatch.setattr(module, "out", lambda message: None)
+    monkeypatch.setattr(module, "err", lambda message: None)
+    monkeypatch.setattr(module, "_conn", None)
+    monkeypatch.setattr(module, "verify", lambda *args: (True, 50))
+    monkeypatch.setattr(module, "enroll_from_image", lambda dev, image, name: None if name == str(img2) else object())
+    assert module.main(["m", "--template", str(tmpl), str(img), str(img2)]) == 0
+
+    monkeypatch.setattr(module, "capture", lambda n, d: [str(img)])
+    monkeypatch.setattr(module, "find_templates", lambda: [str(tmpl)])
+    assert module.main(["m", "--capture", "1"]) == 0
+    monkeypatch.setattr(module, "capture", lambda n, d: [])
+    with pytest.raises(SystemExit):
+        module.main(["m", "--capture", "1"])
+
+    module.FPrint.Print.deserialize.side_effect = module.GLib.Error("bad")
+    module.GLib.Error.message = "bad"
+    assert module.main(["m", "--template", str(tmpl), str(img)]) == 0
+
+    with pytest.raises(SystemExit):
+        module.input_path(tmp_path)
+    assert module.read_input(tmpl) == b"x"
