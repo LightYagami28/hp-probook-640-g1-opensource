@@ -325,7 +325,7 @@ def test_capture_directory_guard_and_command(tmp_path, monkeypatch):
     root = tmp_path / "run"
     root.mkdir()
     monkeypatch.setattr(module, "CAPTURE_ROOT", root.resolve())
-    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
     monkeypatch.setattr(module.os.path, "exists", lambda path: True)
     monkeypatch.setattr(module.time, "sleep", lambda *args, **kwargs: None)
     monkeypatch.setattr(module, "out", lambda message: None)
@@ -367,7 +367,7 @@ def test_capture_directory_guard_and_command(tmp_path, monkeypatch):
 def test_install_template_uses_private_mode(tmp_path, monkeypatch):
     module = match()
     modes = []
-    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
     monkeypatch.setenv("SUDO_USER", "vfs-user")
     monkeypatch.setattr(module.os, "makedirs", lambda *args, **kwargs: None)
     monkeypatch.setattr(module.os.path, "exists", lambda path: False)
@@ -436,3 +436,237 @@ def test_main_enroll_installs_template(tmp_path, monkeypatch):
     assert module.main(["m", "--enroll", str(img)]) == 0
     assert installed
     conn.close.assert_called_once()
+
+
+def test_bridge_pgm_and_socket_delivery(tmp_path, monkeypatch):
+    module = bridge()
+    image = tmp_path / "s.pgm"
+    write_pgm(image, 3, 2)
+    assert module.read_pgm(image) == (3, 2, b"\x10" * 6)
+
+    sock = MagicMock()
+    fake_socket = types.SimpleNamespace(AF_UNIX=1, SOCK_STREAM=1, socket=lambda *args: sock)
+    monkeypatch.setattr(module, "socket", fake_socket)
+    module.deliver(3, 2, b"abcdef")
+    sock.connect.assert_called_once_with(module.SOCK)
+    sock.sendall.assert_called_once_with(struct.pack("<ii", 3, 2) + b"abcdef")
+    sock.close.assert_called_once()
+
+
+def test_bridge_run_and_kill_capture(monkeypatch):
+    module = bridge()
+    proc = MagicMock(pid=42)
+    proc.wait.return_value = 0
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *args, **kwargs: proc)
+    assert module.run_capture("out.pgm") is True
+    assert module.state["proc"] is None
+    proc.wait.return_value = 1
+    assert module.run_capture("out.pgm") is False
+
+    killed = []
+    pkills = []
+    monkeypatch.setattr(module.os, "killpg", lambda pid, sig: killed.append(pid), raising=False)
+    monkeypatch.setattr(module.subprocess, "run", lambda cmd, **kwargs: pkills.append(cmd))
+    proc.poll.return_value = None
+    module.state["proc"] = proc
+    module.kill_capture()
+    assert killed == [42] and len(pkills) == 1
+
+    def refuse(pid, sig):
+        raise OSError("gone")
+
+    monkeypatch.setattr(module.os, "killpg", refuse, raising=False)
+    module.kill_capture()
+    assert len(pkills) == 2
+
+    proc.poll.return_value = 0
+    module.kill_capture()
+    assert len(pkills) == 2
+    module.state["proc"] = None
+
+
+def test_bridge_dbus_event_handlers(monkeypatch):
+    module = bridge()
+    started = []
+    monkeypatch.setattr(module, "log", lambda message: None)
+    monkeypatch.setattr(module, "kill_capture", lambda: started.append("kill"))
+    monkeypatch.setattr(
+        module.threading, "Thread",
+        lambda target, args, daemon: types.SimpleNamespace(start=lambda: started.append(args)),
+    )
+    module.state.update(capturing=False, wanted=False, gen=0)
+    module.on_needed("test")
+    assert started == [(1,)] and module.state["capturing"] is True
+    module.on_needed("again")
+    assert started == [(1,)]
+
+    module.on_not_needed()
+    assert module.state["wanted"] is False and module.state["gen"] == 2
+    assert started[-1] == "kill"
+    module.on_not_needed()
+    assert started.count("kill") == 1
+
+    module.state["capturing"] = False
+    module.on_props_changed("other.iface", {"finger-needed": True}, [])
+    assert module.state["wanted"] is False
+    module.on_props_changed(module.DEV_IFACE, {"finger-needed": True}, [])
+    assert module.state["wanted"] is True
+    module.state["capturing"] = False
+    module.on_props_changed(module.DEV_IFACE, {"finger-needed": False}, [])
+    assert module.state["wanted"] is False
+    module.on_verify_selected()
+    assert module.state["wanted"] is True
+    module.state.update(capturing=False, wanted=False)
+
+
+def test_bridge_main_registers_receivers_and_checks_initial(monkeypatch):
+    module = bridge()
+    bus = MagicMock()
+    needed = []
+    props = MagicMock()
+    props.Get.return_value = True
+    manager = MagicMock()
+    manager.GetDevices.return_value = ["/dev0"]
+    interfaces = iter([manager, props])
+    monkeypatch.setattr(module.dbus, "SystemBus", lambda: bus, raising=False)
+    monkeypatch.setattr(module.dbus, "Interface", lambda obj, name: next(interfaces), raising=False)
+    monkeypatch.setattr(module.dbus.mainloop.glib, "DBusGMainLoop", lambda **kwargs: None, raising=False)
+    monkeypatch.setattr(module, "log", lambda message: None)
+    monkeypatch.setattr(module, "on_needed", needed.append)
+    module.main()
+    assert bus.add_signal_receiver.call_count == 2
+    check_initial = module.GLib.timeout_add.call_args[0][1]
+    assert check_initial() is False
+    assert needed == ["pending at startup"]
+
+    bus.get_object.side_effect = module.dbus.DBusException("no fprintd")
+    assert check_initial() is False
+
+
+def test_capture_timeout_kills_sensor_helper(tmp_path, monkeypatch):
+    module = capture()
+    monkeypatch.setattr(module, "OUTPUT_ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["vfs495-capture", str(tmp_path / "out.pgm")])
+    monkeypatch.setattr(module.os.path, "exists", lambda path: True)
+    calls = []
+
+    def timeout_then_kill(cmd, **kwargs):
+        calls.append(cmd[0])
+        if cmd[0] == "gdb":
+            raise module.subprocess.TimeoutExpired(cmd, 1)
+
+    def broken_unlink(path):
+        raise OSError("busy")
+
+    monkeypatch.setattr(module.subprocess, "run", timeout_then_kill)
+    monkeypatch.setattr(module.os, "unlink", broken_unlink)
+    assert module.main() == 10
+    assert calls == ["gdb", "pkill"]
+
+
+def test_match_send_image_retries_until_socket_accepts(monkeypatch):
+    module = match()
+    attempts = []
+
+    class Sock:
+        def connect(self, path):
+            attempts.append(path)
+            if len(attempts) == 1:
+                raise OSError("not yet")
+
+        def sendall(self, data):
+            attempts.append(data)
+
+    monkeypatch.setattr(module, "_conn", None)
+    monkeypatch.setattr(module.time, "sleep", lambda *args: None)
+    monkeypatch.setattr(module, "socket", types.SimpleNamespace(AF_UNIX=1, SOCK_STREAM=1, socket=lambda *args: Sock()))
+    monkeypatch.setattr(
+        module.threading, "Thread",
+        lambda target, daemon: types.SimpleNamespace(start=target),
+    )
+    module.send_image((2, 1, b"ab"))
+    assert attempts[-1] == struct.pack("<ii", 2, 1) + b"ab"
+    module._conn = None
+
+
+def test_match_open_device_and_enroll(monkeypatch):
+    module = match()
+    device = MagicMock()
+    device.get_driver.return_value = "virtual_image"
+    module.FPrint.Context.return_value.get_devices.return_value = [device]
+    assert module.open_device()[1] is device
+    device.open_sync.assert_called_once()
+    module.FPrint.Context.return_value.get_devices.return_value = []
+    with pytest.raises(SystemExit):
+        module.open_device()
+
+    sent = []
+    monkeypatch.setattr(module, "send_image", lambda *args: sent.append(args))
+    errors = []
+    monkeypatch.setattr(module, "err", errors.append)
+    dev = MagicMock()
+    dev.get_nr_enroll_stages.return_value = 5
+
+    def drive(tmpl, canc, progress, data):
+        for completed in (1, 2, 20):
+            progress(dev, completed, None, None)
+        for _ in range(15):
+            progress(dev, 1, None, None)
+        return "print"
+
+    dev.enroll_sync.side_effect = drive
+    assert module.enroll_from_image(dev, (1, 1, b"x"), "a") == "print"
+    assert module.enroll_from_images(dev, [(1, 1, b"x"), (1, 1, b"y")], "user") == "print"
+    assert sent
+
+    class Boom(Exception):
+        message = "bad scan"
+
+    monkeypatch.setattr(module.GLib, "Error", Boom)
+    dev.enroll_sync.side_effect = Boom()
+    assert module.enroll_from_image(dev, (1, 1, b"x"), "a") is None
+    assert "bad scan" in errors[0]
+    with pytest.raises(SystemExit):
+        module.enroll_from_images(dev, [(1, 1, b"x")], "user")
+
+
+def test_match_verify_scores_and_helpers(monkeypatch):
+    module = match()
+    monkeypatch.setattr(module, "send_image", lambda *args: None)
+    monkeypatch.setattr(module, "err", lambda message: None)
+    monkeypatch.setattr(module.time, "sleep", lambda *args: None)
+    dev = MagicMock()
+
+    def verified(*args):
+        module._lines.extend(["score 12/40", "noise", "score 55/40"])
+        return (True, None)
+
+    dev.verify_sync.side_effect = verified
+    assert module.verify(dev, "tmpl", (1, 1, b"x"), "a") == (True, 55)
+    dev.verify_sync.side_effect = lambda *args: False
+    assert module.verify(dev, "tmpl", (1, 1, b"x"), "a") == (False, -1)
+
+    class Boom(Exception):
+        message = "verify failed"
+
+    monkeypatch.setattr(module.GLib, "Error", Boom)
+    dev.verify_sync.side_effect = Boom()
+    assert module.verify(dev, "tmpl", (1, 1, b"x"), "a") == (False, -1)
+
+    assert "MATCH" in module.fmt(True, 50) and "no match" in module.fmt(False, 3)
+    monkeypatch.setattr(module.glob, "glob", lambda pattern: ["/b", "/a"])
+    monkeypatch.setenv("SUDO_USER", "someone")
+    assert module.find_templates() == ["/a", "/b"]
+
+
+def test_match_root_and_driver_guards(tmp_path, monkeypatch):
+    module = match()
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    with pytest.raises(SystemExit, match="--enroll needs root"):
+        module.install_template(MagicMock(), [], {})
+    with pytest.raises(SystemExit, match="--capture needs root"):
+        module.capture(1, str(tmp_path))
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(module.os.path, "exists", lambda path: False)
+    with pytest.raises(SystemExit, match="HP driver not installed"):
+        module.capture(1, str(tmp_path))
