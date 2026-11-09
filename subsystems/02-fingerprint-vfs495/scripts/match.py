@@ -250,15 +250,19 @@ def score_cross(dev, files, imgs):
             out(f"  enroll {os.path.basename(a):<16} verify {os.path.basename(b):<16} {fmt(m, s)}")
 
 
+def drop_short_scans(files, imgs):
+    for f in tuple(files):
+        if imgs[f][1] < MIN_ROWS:
+            err(f"{f}: only {imgs[f][1]} rows, not a usable scan (skipped)"); files.remove(f)
+
+
 def main(argv):
     args = argv[1:]
     if not args or args[0] in ("-h", "--help"): out(__doc__); return 0
     files, template_file, enroll, captured = parse_args(args)
     if not files: raise SystemExit("no images given")
     imgs = {f: read_pgm(f) for f in files}
-    for f in tuple(files):
-        if imgs[f][1] < MIN_ROWS:
-            err(f"{f}: only {imgs[f][1]} rows, not a usable scan (skipped)"); files.remove(f)
+    drop_short_scans(files, imgs)
     if not files: raise SystemExit("no usable images")
     _, dev = open_device()
     out(f"matcher: libfprint {dev.get_driver()} (NBIS bozorth3), threshold {THRESHOLD}\n")

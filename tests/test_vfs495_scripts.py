@@ -421,3 +421,18 @@ def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         module.input_path(tmp_path)
     assert module.read_input(tmpl) == b"x"
+
+
+def test_main_enroll_installs_template(tmp_path, monkeypatch):
+    module = match()
+    img = tmp_path / "a.pgm"
+    write_pgm(img, 2, 80)
+    conn = MagicMock()
+    installed = []
+    monkeypatch.setattr(module, "open_device", lambda: (None, MagicMock()))
+    monkeypatch.setattr(module, "out", lambda message: None)
+    monkeypatch.setattr(module, "install_template", lambda *args: installed.append(args))
+    monkeypatch.setattr(module, "_conn", conn)
+    assert module.main(["m", "--enroll", str(img)]) == 0
+    assert installed
+    conn.close.assert_called_once()
