@@ -1,9 +1,12 @@
 """Unit tests for the vfs495 script changes. No sensor or libfprint required."""
+import contextlib
 import importlib.util
 import io
 import os
+import runpy
 import struct
 import sys
+import time
 import tempfile
 import types
 from pathlib import Path
@@ -670,3 +673,36 @@ def test_match_root_and_driver_guards(tmp_path, monkeypatch):
     monkeypatch.setattr(module.os.path, "exists", lambda path: False)
     with pytest.raises(SystemExit, match="HP driver not installed"):
         module.capture(1, str(tmp_path))
+
+
+@contextlib.contextmanager
+def preserved_stdout_fd():
+    """match.py redirige il descrittore 1 in una pipe all'import: lo ripristina al termine."""
+    saved = os.dup(1)
+    try:
+        yield
+    finally:
+        os.dup2(saved, 1)
+        os.close(saved)
+
+
+def test_match_collects_libfprint_debug_output():
+    install_stubs()
+    spec = importlib.util.spec_from_file_location("vfs495_match_debug", SCRIPTS / "match.py")
+    module = importlib.util.module_from_spec(spec)
+    with preserved_stdout_fd():
+        spec.loader.exec_module(module)
+        os.write(1, b"libfprint-print: score 57\n")
+        deadline = time.monotonic() + 5
+        while not module._lines and time.monotonic() < deadline:
+            time.sleep(0.01)
+    assert module._lines == ["libfprint-print: score 57\n"]
+
+
+def test_match_script_entry_point_prints_usage_and_cleans_up(monkeypatch, capfd):
+    install_stubs()
+    monkeypatch.setattr(sys, "argv", ["vfs495-match", "--help"])
+    with preserved_stdout_fd(), pytest.raises(SystemExit) as exit_info:
+        runpy.run_path(str(SCRIPTS / "match.py"), run_name="__main__")
+    assert exit_info.value.code == 0
+    assert "vfs495-match IMG1.pgm" in capfd.readouterr().out
