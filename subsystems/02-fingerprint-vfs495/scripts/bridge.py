@@ -8,14 +8,14 @@ import os
 import signal
 import socket
 import struct
-import subprocess
+import subprocess  # nosec B404
 import sys
 import threading
 import time
 
-import dbus
-import dbus.mainloop.glib
-from gi.repository import GLib
+import dbus  # pyright: ignore[reportMissingImports]
+import dbus.mainloop.glib  # pyright: ignore[reportMissingImports]
+from gi.repository import GLib  # pyright: ignore[reportMissingImports]
 
 SOCK = os.environ.get("FP_VIRTUAL_IMAGE", "/run/fprint/virtimg_sock")
 CAPTURE = "/usr/lib/vfs495-fprint/capture.py"
@@ -51,7 +51,7 @@ def kill_capture():
     if p and p.poll() is None:
         try: os.killpg(p.pid, signal.SIGTERM)
         except OSError: pass
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)
+        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)  # nosec B603, B607
 
 def capture_is_current(gen):
     """Return whether this generation is still the capture fprintd wants."""

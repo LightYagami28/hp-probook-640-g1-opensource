@@ -4,7 +4,7 @@
 import os
 import struct
 
-import gdb
+import gdb  # pyright: ignore[reportMissingModuleSource]
 
 OUT = os.environ["VFS_ASM_OUT"]
 hit = {"n": 0}

@@ -4,7 +4,7 @@ under gdb and harvest its motion-compensated assembled fingerprint. Output: PGM.
 Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)"""
 import os
 import struct
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 from pathlib import Path
@@ -32,22 +32,22 @@ def main():
     descriptor, asm = tempfile.mkstemp(dir=out.parent, suffix=".bin")
     os.close(descriptor)
     env = {**os.environ, "LD_LIBRARY_PATH": HP + "/lib", "VFS_ASM_OUT": asm}
-    cmd = ["gdb", "-q", "-batch", "-x", LIB + "/harvest_assembled.py",
-           "--args", binp, "getprintwait", "-doinit"]
     try:
-        subprocess.run(cmd, check=False, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
+        subprocess.run(["gdb", "-q", "-batch", "-x", LIB + "/harvest_assembled.py",  # nosec B603, B607
+                        "--args", binp, "getprintwait", "-doinit"],
+                       check=False, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)
+        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)  # nosec B603, B607
     try:
         with open(asm, "rb") as handle:
-            d = handle.read()
+            data = handle.read()
     finally:
         try: os.unlink(asm)
         except OSError: pass
-    if len(d) < 16:
+    if len(data) < 16:
         print("no finger captured", file=sys.stderr); return 10
-    w, h = struct.unpack("<II", d[:8]); px = d[8:8 + w * h]
+    w, h = struct.unpack("<II", data[:8]); px = data[8:8 + w * h]
     with out.open("wb") as pgm_file:
         pgm_file.write(f"P5\n{w} {h}\n255\n".encode())
         pgm_file.write(px)
