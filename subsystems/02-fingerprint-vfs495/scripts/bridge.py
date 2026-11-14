@@ -51,7 +51,9 @@ def kill_capture():
     if p and p.poll() is None:
         try: os.killpg(p.pid, signal.SIGTERM)
         except OSError: pass
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)  # nosec
+        subprocess.run(  # nosec
+            ["pkill", "-9", "-f", "validity-sensor-unlocked"],
+            check=False, stderr=subprocess.DEVNULL)
 
 def capture_is_current(gen):
     """Return whether this generation is still the capture fprintd wants."""

@@ -38,7 +38,9 @@ def main():
                        check=False, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)  # nosec
+        subprocess.run(  # nosec
+            ["pkill", "-9", "-f", "validity-sensor-unlocked"],
+            check=False, stderr=subprocess.DEVNULL)
     try:
         with open(asm, "rb") as handle:
             data = handle.read()

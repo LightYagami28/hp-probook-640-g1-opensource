@@ -209,7 +209,9 @@ def capture(n, d):
                 out(f"[{i}/{n}] nothing captured (missed the swipe?)")
             time.sleep(1.5)
     finally:
-        subprocess.run(["systemctl", "start", "vfs495-bridge"], check=False, stderr=subprocess.DEVNULL)  # nosec B603, B607
+        subprocess.run(  # nosec
+            ["systemctl", "start", "vfs495-bridge"],
+            check=False, stderr=subprocess.DEVNULL)
     if tiny and not files:
         out("\nEvery scan was tiny. If you did swipe slowly, the sensor is in its stuck state: it returns a few"
             "\nlines and never waits for a finger. Only a FULL POWER-OFF (shut down, wait 10 s, power on) clears it;"
