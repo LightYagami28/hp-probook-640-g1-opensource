@@ -38,7 +38,7 @@ def main():
                        check=False, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)  # nosec B603, B607
+        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], check=False, stderr=subprocess.DEVNULL)  # nosec
     try:
         with open(asm, "rb") as handle:
             data = handle.read()
@@ -47,9 +47,11 @@ def main():
         except OSError: pass
     if len(data) < 16:
         print("no finger captured", file=sys.stderr); return 10
-    w, h = struct.unpack("<II", data[:8]); px = data[8:8 + w * h]
+    width, height = struct.unpack("<II", data[:8])
+    pixels = data[8:8 + width * height]
     with out.open("wb") as pgm_file:
-        pgm_file.write(f"P5\n{w} {h}\n255\n".encode())
-        pgm_file.write(px)
-    print(f"captured {w}x{h} -> {out}"); return 0
+        pgm_file.write(f"P5\n{width} {height}\n255\n".encode())
+        pgm_file.write(pixels)
+    print(f"captured {width}x{height} -> {out}")
+    return 0
 if __name__ == "__main__": sys.exit(main())
