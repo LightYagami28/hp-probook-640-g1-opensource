@@ -14,7 +14,16 @@ Scores are libfprint/NBIS bozorth3 scores. fprintd accepts a swipe when the scor
 enrolled sub-template is >= 40. Genuine swipes of the same finger typically score 40-150,
 different fingers < 15. No sensor is touched unless --capture is used.
 """
-import os, sys, re, glob, socket, struct, subprocess, tempfile, threading, time
+import glob
+import os
+import re
+import socket
+import struct
+import subprocess  # nosec B404
+import sys
+import tempfile
+import threading
+import time
 from pathlib import Path
 
 THRESHOLD = 40
@@ -40,8 +49,9 @@ def err(msg): sys.stderr.write(msg + "\n"); sys.stderr.flush()
 def out(msg): os.write(_orig_stdout, (msg + "\n").encode())
 
 import gi
+
 gi.require_version("FPrint", "2.0")
-from gi.repository import FPrint, GLib  # noqa: E402
+from gi.repository import FPrint, GLib  # pylint: disable=wrong-import-position
 
 
 def input_path(p):
@@ -141,7 +151,7 @@ def install_template(dev, files, imgs):
     out("check of the new template against those scans:")
     for f in files:
         m, s_ = verify(dev, print_, imgs[f], f); out(f"  {os.path.basename(f):<20} {fmt(m, s_)}")
-    subprocess.run(["systemctl", "restart", "fprintd"], stderr=subprocess.DEVNULL)
+    subprocess.run(["systemctl", "restart", "fprintd"], check=False, stderr=subprocess.DEVNULL)  # nosec B603, B607
     out("\nnow test:  fprintd-verify   (wait ~2 s after the prompt, then swipe)")
 
 
@@ -171,7 +181,7 @@ def capture(n, d):
     directory = Path(d).expanduser().resolve()
     if not directory.is_relative_to(CAPTURE_ROOT):
         raise SystemExit(f"capture directory must be below {CAPTURE_ROOT}")
-    subprocess.run(["systemctl", "stop", "vfs495-bridge"], stderr=subprocess.DEVNULL)
+    subprocess.run(["systemctl", "stop", "vfs495-bridge"], check=False, stderr=subprocess.DEVNULL)  # nosec B603, B607
     directory.mkdir(mode=0o700, parents=True, exist_ok=True); files = []; tiny = []
     try:
         for i in range(1, n + 1):
@@ -199,7 +209,9 @@ def capture(n, d):
                 out(f"[{i}/{n}] nothing captured (missed the swipe?)")
             time.sleep(1.5)
     finally:
-        subprocess.run(["systemctl", "start", "vfs495-bridge"], stderr=subprocess.DEVNULL)
+        subprocess.run(  # nosec
+            ["systemctl", "start", "vfs495-bridge"],
+            check=False, stderr=subprocess.DEVNULL)
     if tiny and not files:
         out("\nEvery scan was tiny. If you did swipe slowly, the sensor is in its stuck state: it returns a few"
             "\nlines and never waits for a finger. Only a FULL POWER-OFF (shut down, wait 10 s, power on) clears it;"

@@ -2,8 +2,13 @@
 """vfs495 capture: drive HP's validity-sensor (which holds the sensor's secure session)
 under gdb and harvest its motion-compensated assembled fingerprint. Output: PGM.
 Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)"""
-import os, struct, subprocess, sys, tempfile
+import os
+import struct
+import subprocess  # nosec B404
+import sys
+import tempfile
 from pathlib import Path
+
 HP = "/var/lib/vfs495-fprint"          # HP binary + shim libs (installed by setup-hp-driver.sh)
 LIB = "/usr/lib/vfs495-fprint"
 OUTPUT_ROOT = Path("/run/vfs495-fprint")
@@ -27,23 +32,28 @@ def main():
     descriptor, asm = tempfile.mkstemp(dir=out.parent, suffix=".bin")
     os.close(descriptor)
     env = {**os.environ, "LD_LIBRARY_PATH": HP + "/lib", "VFS_ASM_OUT": asm}
-    cmd = ["gdb", "-q", "-batch", "-x", LIB + "/harvest_assembled.py",
-           "--args", binp, "getprintwait", "-doinit"]
     try:
-        subprocess.run(cmd, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
+        subprocess.run(["gdb", "-q", "-batch", "-x", LIB + "/harvest_assembled.py",  # nosec B603, B607
+                        "--args", binp, "getprintwait", "-doinit"],
+                       check=False, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], stderr=subprocess.DEVNULL)
+        subprocess.run(  # nosec
+            ["pkill", "-9", "-f", "validity-sensor-unlocked"],
+            check=False, stderr=subprocess.DEVNULL)
     try:
-        d = open(asm, "rb").read()
+        with open(asm, "rb") as handle:
+            data = handle.read()
     finally:
         try: os.unlink(asm)
         except OSError: pass
-    if len(d) < 16:
+    if len(data) < 16:
         print("no finger captured", file=sys.stderr); return 10
-    w, h = struct.unpack("<II", d[:8]); px = d[8:8 + w * h]
+    width, height = struct.unpack("<II", data[:8])
+    pixels = data[8:8 + width * height]
     with out.open("wb") as pgm_file:
-        pgm_file.write(f"P5\n{w} {h}\n255\n".encode())
-        pgm_file.write(px)
-    print(f"captured {w}x{h} -> {out}"); return 0
+        pgm_file.write(f"P5\n{width} {height}\n255\n".encode())
+        pgm_file.write(pixels)
+    print(f"captured {width}x{height} -> {out}")
+    return 0
 if __name__ == "__main__": sys.exit(main())

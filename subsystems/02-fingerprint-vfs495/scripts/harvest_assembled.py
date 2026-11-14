@@ -1,7 +1,10 @@
 # gdb python: harvest the motion-compensated assembled fingerprint image from HP's
 # validity-sensor (4.5-136) at IRqualityDetermination (0x4689b0). Writes:
 #   <u32 dim1><u32 dim2><dim1*dim2 bytes>  to $VFS_ASM_OUT
-import gdb, os, struct
+import os
+import struct
+
+import gdb  # pyright: ignore[reportMissingModuleSource]
 
 OUT = os.environ["VFS_ASM_OUT"]
 hit = {"n": 0}

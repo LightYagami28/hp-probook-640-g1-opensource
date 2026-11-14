@@ -4,9 +4,18 @@ finger-needed=true (a verify or enroll is waiting for a swipe), then runs ONE ca
 the real sensor and delivers the image to libfprint's virtual_image socket. When fprintd
 stops needing a finger (timeout, cancel, done) a still-running capture is cancelled, so the
 sensor is never held longer than an authentication actually lasts."""
-import os, signal, socket, struct, subprocess, sys, threading, time
-import dbus, dbus.mainloop.glib
-from gi.repository import GLib
+import os
+import signal
+import socket
+import struct
+import subprocess  # nosec B404
+import sys
+import threading
+import time
+
+import dbus  # pyright: ignore[reportMissingImports]
+import dbus.mainloop.glib  # pyright: ignore[reportMissingImports]
+from gi.repository import GLib  # pyright: ignore[reportMissingImports]
 
 SOCK = os.environ.get("FP_VIRTUAL_IMAGE", "/run/fprint/virtimg_sock")
 CAPTURE = "/usr/lib/vfs495-fprint/capture.py"
@@ -42,7 +51,9 @@ def kill_capture():
     if p and p.poll() is None:
         try: os.killpg(p.pid, signal.SIGTERM)
         except OSError: pass
-        subprocess.run(["pkill", "-9", "-f", "validity-sensor-unlocked"], stderr=subprocess.DEVNULL)
+        subprocess.run(  # nosec
+            ["pkill", "-9", "-f", "validity-sensor-unlocked"],
+            check=False, stderr=subprocess.DEVNULL)
 
 def capture_is_current(gen):
     """Return whether this generation is still the capture fprintd wants."""
