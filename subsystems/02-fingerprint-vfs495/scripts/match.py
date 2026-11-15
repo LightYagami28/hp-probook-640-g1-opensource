@@ -437,9 +437,9 @@ def finish(dev):
     dev.close_sync(None)
 
 
-def run_scoring(dev, files, imgs, template_file, captured):
+def run_scoring(dev, files, imgs, templates):
     """Score the images against the templates and against each other."""
-    score_templates(dev, files, imgs, collect_templates(template_file, captured))
+    score_templates(dev, files, imgs, templates)
     if len(files) >= 2:
         score_cross(dev, files, imgs)
 
@@ -459,7 +459,7 @@ def main(argv):
     if enroll:
         install_template(dev, files, imgs)
     else:
-        run_scoring(dev, files, imgs, template_file, captured)
+        run_scoring(dev, files, imgs, collect_templates(template_file, captured))
     finish(dev)
     return 0
 
