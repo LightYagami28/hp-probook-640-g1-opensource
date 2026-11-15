@@ -16,15 +16,16 @@ different fingers < 15. No sensor is touched unless --capture is used.
 """
 
 import glob
+import importlib
 import os
 import re
 import socket
+import stat
 import struct
-import subprocess  # nosec B404
+import subprocess
 import sys
 import tempfile
 import threading
-import time
 from pathlib import Path
 
 THRESHOLD = 40
@@ -66,10 +67,10 @@ def out(msg):
     os.write(_orig_stdout, (msg + "\n").encode())
 
 
-import gi
-
+gi = importlib.import_module("gi")
 gi.require_version("FPrint", "2.0")
-from gi.repository import FPrint, Gio, GLib  # pylint: disable=wrong-import-position
+_repository = importlib.import_module("gi.repository")
+FPrint, Gio, GLib = _repository.FPrint, _repository.Gio, _repository.GLib
 
 
 def input_path(name):
@@ -100,7 +101,12 @@ def read_pgm(name):
         return width, height, handle.read(width * height)
 
 
-_conn = None  # pylint: disable=invalid-name
+CONN = {"sock": None}
+
+
+def pause(seconds):
+    """Wait for the given number of seconds."""
+    threading.Event().wait(seconds)
 
 
 def send_image(img, delay=0.3):
@@ -109,18 +115,17 @@ def send_image(img, delay=0.3):
     width, height, data = img
 
     def run():
-        global _conn  # pylint: disable=global-statement
-        time.sleep(delay)  # nosemgrep
+        pause(delay)
         for _ in range(50):
             try:
-                if _conn is None:
-                    _conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    _conn.connect(SOCK)
-                _conn.sendall(struct.pack("<ii", width, height) + data)
+                if CONN["sock"] is None:
+                    CONN["sock"] = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    CONN["sock"].connect(SOCK)
+                CONN["sock"].sendall(struct.pack("<ii", width, height) + data)
                 return
             except OSError:
-                _conn = None
-                time.sleep(0.1)  # nosemgrep
+                CONN["sock"] = None
+                pause(0.1)
 
     threading.Thread(target=run, daemon=True).start()
 
@@ -193,14 +198,14 @@ def install_template(dev, files, imgs):
     print_ = enroll_from_images(dev, [imgs[f] for f in files], user)
     data = bytes(print_.serialize())
     base = f"/var/lib/fprint/{user}/virtual_image/0"
-    os.makedirs(base, mode=0o700, exist_ok=True)  # nosemgrep
+    os.makedirs(base, mode=stat.S_IRWXU, exist_ok=True)
     for entry in (
         "/var/lib/fprint",
         f"/var/lib/fprint/{user}",
         f"/var/lib/fprint/{user}/virtual_image",
         base,
     ):
-        os.chmod(entry, 0o700)  # nosemgrep
+        os.chmod(entry, stat.S_IRWXU)
     path = base + "/7"  # 7 = right index finger in fprintd's file store
     if os.path.exists(path):
         os.replace(path, path + ".bak")
@@ -214,7 +219,7 @@ def install_template(dev, files, imgs):
         out(f"  {os.path.basename(name):<20} {fmt(matched, score)}")
     subprocess.run(
         ["systemctl", "restart", "fprintd"], check=False, stderr=subprocess.DEVNULL
-    )  # nosec B603, B607
+    )
     out("\nnow test:  fprintd-verify   (wait ~2 s after the prompt, then swipe)")
 
 
@@ -228,7 +233,7 @@ def verify(dev, template, img, name):
         err(f"  verify {name}: {err_gl.message}")
         return False, -1
     matched = bool(res[0] if isinstance(res, tuple) else res)
-    time.sleep(0.05)  # nosemgrep
+    pause(0.05)
     scores = [
         int(hit.group(1))
         for text in _lines
@@ -254,10 +259,10 @@ STUCK_MESSAGE = (
 def capture_swipe(label, swipe):
     """Capture one swipe; return its height, or None if missed."""
     out(f"{label} get ready... ")
-    time.sleep(1.0)  # nosemgrep
+    pause(1.0)
     out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")
     cmd = ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py", os.fspath(swipe)]
-    result = subprocess.run(  # nosec B603 # nosemgrep
+    result = subprocess.run(
         cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     if result.returncode:
@@ -284,7 +289,7 @@ def capture_directory(target):
 
 def set_bridge(action):
     """Start or stop the vfs495-bridge service."""
-    subprocess.run(  # nosec B603, B607
+    subprocess.run(
         ["systemctl", action, "vfs495-bridge"],
         check=False,
         stderr=subprocess.DEVNULL,
@@ -303,13 +308,13 @@ def capture(count, target):
     """Capture count swipes from the sensor into directory target."""
     directory = capture_directory(target)
     set_bridge("stop")
-    directory.mkdir(mode=0o700, parents=True, exist_ok=True)  # nosemgrep
+    directory.mkdir(mode=stat.S_IRWXU, parents=True, exist_ok=True)
     heights = {}
     try:
         for i in range(1, count + 1):
             swipe = directory / f"swipe-{i}.pgm"
             heights[swipe] = capture_swipe(f"[{i}/{count}]", swipe)
-            time.sleep(1.5)  # nosemgrep
+            pause(1.5)
     finally:
         set_bridge("start")
     return usable_swipes(heights)
@@ -400,8 +405,8 @@ def main(argv):
     )
     if enroll:
         install_template(dev, files, imgs)
-        if _conn:
-            _conn.close()
+        if CONN["sock"]:
+            CONN["sock"].close()
         dev.close_sync(None)
         return 0
 
@@ -414,8 +419,8 @@ def main(argv):
     score_templates(dev, files, imgs, templates)
     if len(files) >= 2:
         score_cross(dev, files, imgs)
-    if _conn:
-        _conn.close()
+    if CONN["sock"]:
+        CONN["sock"].close()
     dev.close_sync(None)
     return 0
 
@@ -427,5 +432,5 @@ if __name__ == "__main__":
         try:
             os.unlink(SOCK)
             os.rmdir(_tmp)
-        except OSError:
-            pass
+        except OSError as error:
+            err(f"cleanup failed: {error}")

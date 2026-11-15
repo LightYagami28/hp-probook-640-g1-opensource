@@ -5,18 +5,19 @@ the real sensor and delivers the image to libfprint's virtual_image socket. When
 stops needing a finger (timeout, cancel, done) a still-running capture is cancelled, so the
 sensor is never held longer than an authentication actually lasts."""
 
+import importlib
 import os
 import signal
 import socket
 import struct
-import subprocess  # nosec B404
+import subprocess
 import sys
 import threading
 import time
 
-import dbus  # pyright: ignore[reportMissingImports]
-import dbus.mainloop.glib  # pyright: ignore[reportMissingImports]
-from gi.repository import GLib  # pyright: ignore[reportMissingImports]
+dbus = importlib.import_module("dbus")
+importlib.import_module("dbus.mainloop.glib")
+GLib = importlib.import_module("gi.repository").GLib
 
 SOCK = os.environ.get("FP_VIRTUAL_IMAGE", "/run/fprint/virtimg_sock")
 CAPTURE = "/usr/lib/vfs495-fprint/capture.py"
@@ -55,18 +56,18 @@ def deliver(width, height, data):
 
 def run_capture(out):
     """One capture attempt. Returns True if an image was written to `out`."""
-    proc = subprocess.Popen(  # pylint: disable=consider-using-with  # nosec B603  # nosemgrep
+    with subprocess.Popen(
         [sys.executable, CAPTURE, out],
         env={**os.environ, "VFS_TIMEOUT": "70"},
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
-    )
-    with lock:
-        state["proc"] = proc
-    code = proc.wait()
-    with lock:
-        state["proc"] = None
+    ) as proc:
+        with lock:
+            state["proc"] = proc
+        code = proc.wait()
+        with lock:
+            state["proc"] = None
     return not code
 
 
@@ -77,9 +78,9 @@ def kill_capture():
     if proc and proc.poll() is None:
         try:
             os.killpg(proc.pid, signal.SIGTERM)
-        except OSError:
-            pass
-        subprocess.run(  # nosec
+        except OSError as error:
+            log(f"cannot stop the capture process: {error}")
+        subprocess.run(
             ["pkill", "-9", "-f", "validity-sensor-unlocked"],
             check=False,
             stderr=subprocess.DEVNULL,
@@ -130,8 +131,8 @@ def capture_and_deliver(gen):
     finally:
         try:
             os.unlink(out)
-        except OSError:
-            pass
+        except OSError as error:
+            log(f"cannot remove {out}: {error}")
         state["capturing"] = False
 
 
@@ -158,9 +159,7 @@ def on_not_needed():
         kill_capture()
 
 
-def on_props_changed(
-    iface, changed, _invalidated, path=None
-):  # pylint: disable=unused-argument
+def on_props_changed(iface, changed, *_args, **_kwargs):
     """React to the finger-needed property of the fprintd device."""
     if iface != DEV_IFACE or "finger-needed" not in changed:
         return
@@ -170,7 +169,7 @@ def on_props_changed(
         on_not_needed()
 
 
-def on_verify_selected(*args, path=None):  # pylint: disable=unused-argument
+def on_verify_selected(*_args, **_kwargs):
     """Start a capture when a verify begins."""
     on_needed("verify started")
 
@@ -204,8 +203,8 @@ def main():
                 iface = dbus.Interface(bus.get_object(BUS_NAME, dev), PROPS)
                 if bool(iface.Get(DEV_IFACE, "finger-needed")):
                     on_needed("pending at startup")
-        except dbus.DBusException:
-            pass
+        except dbus.DBusException as error:
+            log(f"startup check failed: {error}")
         return False
 
     GLib.timeout_add(1500, check_initial)

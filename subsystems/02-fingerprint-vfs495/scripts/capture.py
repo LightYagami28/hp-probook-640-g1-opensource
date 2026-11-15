@@ -5,7 +5,7 @@ Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)"""
 
 import os
 import struct
-import subprocess  # nosec B404
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -42,7 +42,7 @@ def main():
                 "-q",
                 "-batch",
                 "-x",
-                LIB + "/harvest_assembled.py",  # nosec B603, B607
+                LIB + "/harvest_assembled.py",
                 "--args",
                 binp,
                 "getprintwait",
@@ -55,7 +55,7 @@ def main():
             stderr=subprocess.DEVNULL,
         )
     except subprocess.TimeoutExpired:
-        subprocess.run(  # nosec
+        subprocess.run(
             ["pkill", "-9", "-f", "validity-sensor-unlocked"],
             check=False,
             stderr=subprocess.DEVNULL,
@@ -66,8 +66,8 @@ def main():
     finally:
         try:
             os.unlink(asm)
-        except OSError:
-            pass
+        except OSError as error:
+            print(f"cannot remove {asm}: {error}", file=sys.stderr)
     if len(data) < 16:
         print("no finger captured", file=sys.stderr)
         return 10
