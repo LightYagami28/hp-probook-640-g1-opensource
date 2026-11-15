@@ -257,8 +257,10 @@ def capture_swipe(label, swipe):
     time.sleep(1.0)  # nosemgrep
     out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")
     cmd = ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py", os.fspath(swipe)]
-    quiet = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-    if subprocess.run(cmd, check=False, **quiet).returncode:  # nosec B603
+    result = subprocess.run(  # nosec B603 # nosemgrep
+        cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    if result.returncode:
         out(f"{label} nothing captured (missed the swipe?)")
         return None
     width, height, _ = read_pgm(swipe)
@@ -289,6 +291,14 @@ def set_bridge(action):
     )
 
 
+def usable_swipes(heights):
+    """Return the swipes tall enough to score, warning when all of them were tiny."""
+    files = [p for p, h in heights.items() if h is not None and h >= MIN_ROWS]
+    if not files and any(h is not None for h in heights.values()):
+        out(STUCK_MESSAGE)
+    return files
+
+
 def capture(count, target):
     """Capture count swipes from the sensor into directory target."""
     directory = capture_directory(target)
@@ -302,10 +312,7 @@ def capture(count, target):
             time.sleep(1.5)  # nosemgrep
     finally:
         set_bridge("start")
-    files = [p for p, h in heights.items() if h is not None and h >= MIN_ROWS]
-    if not files and any(h is not None for h in heights.values()):
-        out(STUCK_MESSAGE)
-    return files
+    return usable_swipes(heights)
 
 
 def find_templates():
