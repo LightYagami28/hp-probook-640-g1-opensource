@@ -193,13 +193,8 @@ def enroll_from_images(dev, imgs, user):
         raise SystemExit(f"enroll failed: {err_gl.message}") from err_gl
 
 
-def install_template(dev, files, imgs):
-    """Enroll the scans and install the template in the fprintd store."""
-    if os.geteuid():
-        raise SystemExit("--enroll needs root: sudo vfs495-match --enroll IMG...")
-    user = os.environ.get("SUDO_USER") or "root"
-    print_ = enroll_from_images(dev, [imgs[name] for name in files], user)
-    data = bytes(print_.serialize())
+def write_template(user, data):
+    """Store the serialized template in fprintd's private directory and return its path."""
     base = f"/var/lib/fprint/{user}/virtual_image/0"
     os.makedirs(base, mode=stat.S_IRWXU, exist_ok=True)
     for entry in (
@@ -215,17 +210,38 @@ def install_template(dev, files, imgs):
     with open(path, "wb") as handle:
         handle.write(data)
     os.chmod(path, 0o600)
-    out(f"enrolled right index finger for {user} from {len(files)} scan(s) -> {path}")
+    return path
+
+
+def check_template(dev, print_, files, imgs):
+    """Verify the new template against the scans it was built from."""
     out("check of the new template against those scans:")
     for name in files:
         matched, score = verify(dev, print_, imgs[name], name)
         out(f"  {os.path.basename(name):<20} {fmt(matched, score)}")
+
+
+def install_template(dev, files, imgs):
+    """Enroll the scans and install the template in the fprintd store."""
+    if os.geteuid():
+        raise SystemExit("--enroll needs root: sudo vfs495-match --enroll IMG...")
+    user = os.environ.get("SUDO_USER") or "root"
+    print_ = enroll_from_images(dev, [imgs[name] for name in files], user)
+    path = write_template(user, bytes(print_.serialize()))
+    out(f"enrolled right index finger for {user} from {len(files)} scan(s) -> {path}")
+    check_template(dev, print_, files, imgs)
     subprocess.run(
         ["/usr/bin/systemctl", "restart", "fprintd"],
         check=False,
         stderr=subprocess.DEVNULL,
     )
     out("\nnow test:  fprintd-verify   (wait ~2 s after the prompt, then swipe)")
+
+
+def best_score(lines):
+    """Return the highest bozorth3 score found in the libfprint debug lines, or -1."""
+    hits = (re.search(r"score (-?\d+)/(\d+)", text) for text in lines)
+    return max((int(hit.group(1)) for hit in hits if hit), default=-1)
 
 
 def verify(dev, template, img, name):
@@ -239,13 +255,7 @@ def verify(dev, template, img, name):
         return False, -1
     matched = bool(res[0] if isinstance(res, tuple) else res)
     pause(0.05)
-    scores = [
-        int(hit.group(1))
-        for text in _lines
-        for hit in [re.search(r"score (-?\d+)/(\d+)", text)]
-        if hit
-    ]
-    return matched, (max(scores) if scores else -1)
+    return matched, best_score(_lines)
 
 
 def fmt(matched, score):
@@ -337,23 +347,26 @@ def find_templates():
     return sorted(glob.glob(f"/var/lib/fprint/{user}/virtual_image/0/*"))
 
 
+def capture_args(args):
+    """Run --capture with its optional count and directory and return the scans."""
+    count = int(args[1]) if len(args) > 1 else 3
+    target = args[2] if len(args) > 2 else "/run/vfs495-fprint/test"
+    files = capture(count, target)
+    if not files:
+        raise SystemExit("no captures to score")
+    out("")
+    return files
+
+
 def parse_args(args):
-    """Returns (files, template_file, enroll, captured) from the command line."""
-    template_file = None
-    enroll = False
+    """Return (files, template_file, enroll, captured) from the command line."""
     if args[0] == "--capture":
-        count = int(args[1]) if len(args) > 1 else 3
-        target = args[2] if len(args) > 2 else "/run/vfs495-fprint/test"
-        files = capture(count, target)
-        if len(files) < 1:
-            raise SystemExit("no captures to score")
-        out("")
-        return files, template_file, enroll, True
+        return capture_args(args), None, False, True
+    template_file = None
     if args[0] == "--template":
         template_file, args = args[1], args[2:]
-    if args and args[0] == "--enroll":
-        enroll, args = True, args[1:]
-    return args, template_file, enroll, False
+    enroll = bool(args) and args[0] == "--enroll"
+    return (args[1:] if enroll else args), template_file, enroll, False
 
 
 def score_templates(dev, files, imgs, templates):
