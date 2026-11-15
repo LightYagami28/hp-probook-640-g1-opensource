@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""vfs495 bridge (event-driven): stays completely idle until fprintd's device reports
-finger-needed=true (a verify or enroll is waiting for a swipe), then runs ONE capture on
-the real sensor and delivers the image to libfprint's virtual_image socket. When fprintd
-stops needing a finger (timeout, cancel, done) a still-running capture is cancelled, so the
-sensor is never held longer than an authentication actually lasts."""
+"""Event-driven bridge between the vfs495 sensor and fprintd.
+
+It stays completely idle until fprintd's device reports finger-needed=true (a verify or
+enroll is waiting for a swipe), then runs ONE capture on the real sensor and delivers the
+image to libfprint's virtual_image socket. When fprintd stops needing a finger (timeout,
+cancel, done) a still-running capture is cancelled, so the sensor is never held longer
+than an authentication actually lasts.
+"""
 
 import importlib
 import os
@@ -92,6 +95,16 @@ def capture_is_current(gen):
     return state["gen"] == gen and state["wanted"]
 
 
+def send_scan(img, started):
+    """Deliver a usable scan to fprintd and log how long it took."""
+    try:
+        deliver(*img)
+        elapsed = round(time.monotonic() - started, 1)
+        log(f"delivered scan {img[0]}x{img[1]} after {elapsed}s")
+    except OSError as error:
+        log(f"deliver failed: {error}")
+
+
 def deliver_capture(out, last, gen, started):
     """Capture once and deliver the scan when it is still wanted and usable."""
     if not run_capture(out):
@@ -107,13 +120,16 @@ def deliver_capture(out, last, gen, started):
             "its stuck state (then: full power-off, not a reboot)"
         )
         return False
-    try:
-        deliver(*img)
-        elapsed = round(time.monotonic() - started, 1)
-        log(f"delivered scan {img[0]}x{img[1]} after {elapsed}s")
-    except OSError as error:
-        log(f"deliver failed: {error}")
+    send_scan(img, started)
     return True
+
+
+def remove_file(path):
+    """Delete a file, logging the reason when it cannot be removed."""
+    try:
+        os.unlink(path)
+    except OSError as error:
+        log(f"cannot remove {path}: {error}")
 
 
 def capture_and_deliver(gen):
@@ -124,15 +140,9 @@ def capture_and_deliver(gen):
         for attempt in range(2):
             if deliver_capture(out, last, gen, time.monotonic()):
                 return
-            log(
-                "no usable finger scan"
-                + (", retrying" if not attempt else " (give up)")
-            )
+            log("no usable finger scan" + (" (give up)" if attempt else ", retrying"))
     finally:
-        try:
-            os.unlink(out)
-        except OSError as error:
-            log(f"cannot remove {out}: {error}")
+        remove_file(out)
         state["capturing"] = False
 
 
