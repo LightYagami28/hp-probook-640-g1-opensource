@@ -72,24 +72,24 @@ gi.require_version("FPrint", "2.0")
 from gi.repository import FPrint, GLib  # pylint: disable=wrong-import-position
 
 
-def input_path(p):
+def input_path(name):
     """Return the resolved path of an existing regular file."""
-    path = Path(p).expanduser().resolve(strict=True)
+    path = Path(name).expanduser().resolve(strict=True)
     if not path.is_file():
-        raise SystemExit(f"{p}: not a regular file")
+        raise SystemExit(f"{name}: not a regular file")
     return path
 
 
-def read_input(p):
+def read_input(name):
     """Return the bytes of an input file."""
-    return input_path(p).read_bytes()
+    return input_path(name).read_bytes()
 
 
-def read_pgm(p):
+def read_pgm(name):
     """Read a binary PGM file and return (width, height, pixels)."""
-    with input_path(p).open("rb") as handle:
+    with input_path(name).open("rb") as handle:
         if handle.readline().strip() != b"P5":
-            raise SystemExit(f"{p}: not a binary PGM (P5)")
+            raise SystemExit(f"{name}: not a binary PGM (P5)")
         tok = []
         while len(tok) < 3:
             line = handle.readline()
@@ -100,23 +100,23 @@ def read_pgm(p):
         return width, height, handle.read(width * height)
 
 
-_conn = None
+_conn = None  # pylint: disable=invalid-name
 
 
 def send_image(img, delay=0.3):
     """Feed one image to the in-process virtual_image device (from a helper thread, over one
     persistent connection so the driver never sees a hang-up mid-operation)."""
-    w, h, data = img
+    width, height, data = img
 
     def run():
-        global _conn
+        global _conn  # pylint: disable=global-statement
         time.sleep(delay)
         for _ in range(50):
             try:
                 if _conn is None:
                     _conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     _conn.connect(SOCK)
-                _conn.sendall(struct.pack("<ii", w, h) + data)
+                _conn.sendall(struct.pack("<ii", width, height) + data)
                 return
             except OSError:
                 _conn = None
@@ -129,10 +129,10 @@ def open_device():
     """Open the libfprint virtual_image device."""
     ctx = FPrint.Context()
     ctx.enumerate()
-    for d in ctx.get_devices():
-        if d.get_driver() == "virtual_image":
-            d.open_sync(None)
-            return ctx, d
+    for device in ctx.get_devices():
+        if device.get_driver() == "virtual_image":
+            device.open_sync(None)
+            return ctx, device
     raise SystemExit(
         "libfprint virtual_image device not available (is libfprint-2-2 installed?)"
     )
@@ -146,21 +146,23 @@ def enroll_from_image(dev, img, name):
     from gi.repository import Gio
 
     canc = Gio.Cancellable()
-    n = {"sent": 1}
+    stage = {"sent": 1}
 
-    def progress(device, completed, print_, user_data, error=None):
-        if n["sent"] >= 8:
+    def progress(
+        device, completed, print_, user_data, error=None
+    ):  # pylint: disable=unused-argument
+        if stage["sent"] >= 8:
             canc.cancel()
             return  # image keeps failing minutiae extraction
         if completed < dev.get_nr_enroll_stages():
-            n["sent"] += 1
+            stage["sent"] += 1
             send_image(img, 0.2)
 
     send_image(img)
     try:
         return dev.enroll_sync(tmpl, canc, progress, None)
-    except GLib.Error as e:
-        err(f"  enroll from {name} failed: {e.message}")
+    except GLib.Error as err_gl:
+        err(f"  enroll from {name} failed: {err_gl.message}")
         return None
 
 
@@ -172,50 +174,54 @@ def enroll_from_images(dev, imgs, user):
     tmpl.set_finger(FPrint.Finger.RIGHT_INDEX)
     tmpl.set_username(user)
     canc = Gio.Cancellable()
-    n = {"sent": 1}
+    stage = {"sent": 1}
 
-    def progress(device, completed, print_, user_data, error=None):
-        if n["sent"] >= 12:
+    def progress(
+        device, completed, print_, user_data, error=None
+    ):  # pylint: disable=unused-argument
+        if stage["sent"] >= 12:
             canc.cancel()
             return
         if completed < dev.get_nr_enroll_stages():
-            send_image(imgs[n["sent"] % len(imgs)], 0.2)
-            n["sent"] += 1
+            send_image(imgs[stage["sent"] % len(imgs)], 0.2)
+            stage["sent"] += 1
 
     send_image(imgs[0])
     try:
         return dev.enroll_sync(tmpl, canc, progress, None)
-    except GLib.Error as e:
-        raise SystemExit(f"enroll failed: {e.message}") from e
+    except GLib.Error as err_gl:
+        raise SystemExit(f"enroll failed: {err_gl.message}") from err_gl
 
 
 def install_template(dev, files, imgs):
     """Enroll the scans and install the template in the fprintd store."""
-    if os.geteuid() != 0:
+    if (
+        os.geteuid() != 0
+    ):  # pylint: disable=use-implicit-booleaness-not-comparison-to-zero
         raise SystemExit("--enroll needs root: sudo vfs495-match --enroll IMG...")
     user = os.environ.get("SUDO_USER") or "root"
     print_ = enroll_from_images(dev, [imgs[f] for f in files], user)
     data = bytes(print_.serialize())
-    d = f"/var/lib/fprint/{user}/virtual_image/0"
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    for p in (
+    base = f"/var/lib/fprint/{user}/virtual_image/0"
+    os.makedirs(base, mode=0o700, exist_ok=True)
+    for entry in (
         "/var/lib/fprint",
         f"/var/lib/fprint/{user}",
         f"/var/lib/fprint/{user}/virtual_image",
-        d,
+        base,
     ):
-        os.chmod(p, 0o700)
-    path = d + "/7"  # 7 = right index finger in fprintd's file store
+        os.chmod(entry, 0o700)
+    path = base + "/7"  # 7 = right index finger in fprintd's file store
     if os.path.exists(path):
         os.replace(path, path + ".bak")
-    with open(path, "wb") as fh:
-        fh.write(data)
+    with open(path, "wb") as handle:
+        handle.write(data)
     os.chmod(path, 0o600)
     out(f"enrolled right index finger for {user} from {len(files)} scan(s) -> {path}")
     out("check of the new template against those scans:")
-    for f in files:
-        m, s_ = verify(dev, print_, imgs[f], f)
-        out(f"  {os.path.basename(f):<20} {fmt(m, s_)}")
+    for name in files:
+        matched, score = verify(dev, print_, imgs[name], name)
+        out(f"  {os.path.basename(name):<20} {fmt(matched, score)}")
     subprocess.run(
         ["systemctl", "restart", "fprintd"], check=False, stderr=subprocess.DEVNULL
     )  # nosec B603, B607
@@ -228,16 +234,16 @@ def verify(dev, template, img, name):
     send_image(img)
     try:
         res = dev.verify_sync(template, None, None, None)
-    except GLib.Error as e:
-        err(f"  verify {name}: {e.message}")
+    except GLib.Error as err_gl:
+        err(f"  verify {name}: {err_gl.message}")
         return False, -1
     matched = bool(res[0] if isinstance(res, tuple) else res)
     time.sleep(0.05)
     scores = [
-        int(m.group(1))
-        for l in _lines
-        for m in [re.search(r"score (-?\d+)/(\d+)", l)]
-        if m
+        int(hit.group(1))
+        for text in _lines
+        for hit in [re.search(r"score (-?\d+)/(\d+)", text)]
+        if hit
     ]
     return matched, (max(scores) if scores else -1)
 
@@ -248,13 +254,15 @@ def fmt(matched, score):
     return f"{score:4d}/{THRESHOLD}  {tag}"
 
 
-def capture(n, d):
-    """Capture n swipes from the sensor into directory d."""
-    if os.geteuid() != 0:
+def capture(count, target):
+    """Capture count swipes from the sensor into directory target."""
+    if (
+        os.geteuid() != 0
+    ):  # pylint: disable=use-implicit-booleaness-not-comparison-to-zero
         raise SystemExit("--capture needs root: sudo vfs495-match --capture N")
     if not os.path.exists("/var/lib/vfs495-fprint/validity-sensor-unlocked"):
         raise SystemExit("HP driver not installed; run: sudo vfs495-setup-hp-driver")
-    directory = Path(d).expanduser().resolve()
+    directory = Path(target).expanduser().resolve()
     if not directory.is_relative_to(CAPTURE_ROOT):
         raise SystemExit(f"capture directory must be below {CAPTURE_ROOT}")
     subprocess.run(
@@ -264,34 +272,34 @@ def capture(n, d):
     files = []
     tiny = []
     try:
-        for i in range(1, n + 1):
-            p = directory / f"swipe-{i}.pgm"
-            out(f"[{i}/{n}] get ready... ")
+        for i in range(1, count + 1):
+            swipe = directory / f"swipe-{i}.pgm"
+            out(f"[{i}/{count}] get ready... ")
             time.sleep(1.0)
-            out(f"[{i}/{n}] SWIPE NOW (slowly, whole fingertip, one steady motion)")
+            out(f"[{i}/{count}] SWIPE NOW (slowly, whole fingertip, one steady motion)")
             completed = subprocess.run(  # nosec B603
                 [
                     "/usr/bin/python3",
                     "/usr/lib/vfs495-fprint/capture.py",
-                    os.fspath(p),
+                    os.fspath(swipe),
                 ],
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             if completed.returncode == 0:
-                w, h, _ = read_pgm(p)
-                if h < MIN_ROWS:
+                width, height, _ = read_pgm(swipe)
+                if height < MIN_ROWS:
                     out(
-                        f"[{i}/{n}] tiny scan {w}x{h}: swipe too short/fast, or the sensor is stuck (see below)"
+                        f"[{i}/{count}] tiny scan {width}x{height}: swipe too short/fast, or the sensor is stuck (see below)"
                     )
-                    tiny.append(h)
-                    p.unlink()
+                    tiny.append(height)
+                    swipe.unlink()
                 else:
-                    out(f"[{i}/{n}] captured {w}x{h} -> {p}")
-                    files.append(p)
+                    out(f"[{i}/{count}] captured {width}x{height} -> {swipe}")
+                    files.append(swipe)
             else:
-                out(f"[{i}/{n}] nothing captured (missed the swipe?)")
+                out(f"[{i}/{count}] nothing captured (missed the swipe?)")
             time.sleep(1.5)
     finally:
         subprocess.run(  # nosec
@@ -319,9 +327,9 @@ def parse_args(args):
     template_file = None
     enroll = False
     if args[0] == "--capture":
-        n = int(args[1]) if len(args) > 1 else 3
-        d = args[2] if len(args) > 2 else "/run/vfs495-fprint/test"
-        files = capture(n, d)
+        count = int(args[1]) if len(args) > 1 else 3
+        target = args[2] if len(args) > 2 else "/run/vfs495-fprint/test"
+        files = capture(count, target)
         if len(files) < 1:
             raise SystemExit("no captures to score")
         out("")
@@ -338,15 +346,15 @@ def score_templates(dev, files, imgs, templates):
     for tpath, tdata in templates:
         try:
             tmpl = FPrint.Print.deserialize(tdata)
-        except GLib.Error as e:
-            err(f"cannot load template {tpath}: {e.message}")
+        except GLib.Error as err_gl:
+            err(f"cannot load template {tpath}: {err_gl.message}")
             continue
         out(
             f"against enrolled template {tpath} ({FPrint.Finger(tmpl.get_finger()).value_nick}):"
         )
         for f in files:
-            m, s = verify(dev, tmpl, imgs[f], f)
-            out(f"  {os.path.basename(f):<20} {fmt(m, s)}")
+            matched, score = verify(dev, tmpl, imgs[f], f)
+            out(f"  {os.path.basename(f):<20} {fmt(matched, score)}")
         out("")
 
 
@@ -360,9 +368,9 @@ def score_cross(dev, files, imgs):
         for b in files:
             if a == b:
                 continue
-            m, s = verify(dev, tmpl, imgs[b], b)
+            matched, score = verify(dev, tmpl, imgs[b], b)
             out(
-                f"  enroll {os.path.basename(a):<16} verify {os.path.basename(b):<16} {fmt(m, s)}"
+                f"  enroll {os.path.basename(a):<16} verify {os.path.basename(b):<16} {fmt(matched, score)}"
             )
 
 
@@ -402,8 +410,8 @@ def main(argv):
     if template_file:
         templates.append((template_file, read_input(template_file)))
     elif captured:
-        for t in find_templates():
-            templates.append((t, read_input(t)))
+        for tpl in find_templates():
+            templates.append((tpl, read_input(tpl)))
     score_templates(dev, files, imgs, templates)
     if len(files) >= 2:
         score_cross(dev, files, imgs)

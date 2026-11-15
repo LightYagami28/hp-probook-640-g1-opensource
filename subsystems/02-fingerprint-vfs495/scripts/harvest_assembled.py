@@ -17,9 +17,9 @@ class BP(gdb.Breakpoint):  # pylint: disable=too-few-public-methods
 
     def stop(self):
         """Continue execution, storing one assembled image when its size is plausible."""
-        f = gdb.selected_frame()
+        frame = gdb.selected_frame()
         inf = gdb.selected_inferior()
-        ctx = int(f.read_register("rdi")) & 0xFFFFFFFFFFFFFFFF
+        ctx = int(frame.read_register("rdi")) & 0xFFFFFFFFFFFFFFFF
         try:
             img = int.from_bytes(inf.read_memory(ctx + 0xA8, 8), "little")
             if img:

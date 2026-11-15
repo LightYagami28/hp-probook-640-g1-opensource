@@ -30,32 +30,32 @@ lock = threading.Lock()
 state = {"proc": None, "capturing": False, "wanted": False, "gen": 0}
 
 
-def log(m):
+def log(msg):
     """Write a tagged line to stderr."""
-    print("[vfs495-bridge] " + m, file=sys.stderr, flush=True)
+    print("[vfs495-bridge] " + msg, file=sys.stderr, flush=True)
 
 
-def read_pgm(p):
+def read_pgm(path):
     """Read a binary PGM file and return (width, height, pixels)."""
-    with open(p, "rb") as f:
-        if f.readline().strip() != b"P5":
+    with open(path, "rb") as handle:
+        if handle.readline().strip() != b"P5":
             raise ValueError("not a binary PGM (P5)")
-        w, h = map(int, f.readline().split())
-        f.readline()
-        return w, h, f.read(w * h)
+        width, height = map(int, handle.readline().split())
+        handle.readline()
+        return width, height, handle.read(width * height)
 
 
-def deliver(w, h, data):
+def deliver(width, height, data):
     """Send one image to the libfprint virtual_image socket."""
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(SOCK)
-    s.sendall(struct.pack("<ii", w, h) + data)
-    s.close()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(SOCK)
+    sock.sendall(struct.pack("<ii", width, height) + data)
+    sock.close()
 
 
 def run_capture(out):
     """One capture attempt. Returns True if an image was written to `out`."""
-    p = subprocess.Popen(
+    proc = subprocess.Popen(  # pylint: disable=consider-using-with  # nosec B603
         [sys.executable, CAPTURE, out],
         env={**os.environ, "VFS_TIMEOUT": "70"},
         stdout=subprocess.DEVNULL,
@@ -63,20 +63,20 @@ def run_capture(out):
         start_new_session=True,
     )
     with lock:
-        state["proc"] = p
-    rc = p.wait()
+        state["proc"] = proc
+    code = proc.wait()
     with lock:
         state["proc"] = None
-    return rc == 0
+    return code == 0
 
 
 def kill_capture():
     """Terminate a running capture and the HP sensor process."""
     with lock:
-        p = state["proc"]
-    if p and p.poll() is None:
+        proc = state["proc"]
+    if proc and proc.poll() is None:
         try:
-            os.killpg(p.pid, signal.SIGTERM)
+            os.killpg(proc.pid, signal.SIGTERM)
         except OSError:
             pass
         subprocess.run(  # nosec
@@ -158,7 +158,9 @@ def on_not_needed():
         kill_capture()
 
 
-def on_props_changed(iface, changed, invalidated, path=None):
+def on_props_changed(
+    iface, changed, invalidated, path=None
+):  # pylint: disable=unused-argument
     """React to the finger-needed property of the fprintd device."""
     if iface != DEV_IFACE or "finger-needed" not in changed:
         return
@@ -168,7 +170,7 @@ def on_props_changed(iface, changed, invalidated, path=None):
         on_not_needed()
 
 
-def on_verify_selected(*args, path=None):
+def on_verify_selected(*args, path=None):  # pylint: disable=unused-argument
     """Start a capture when a verify begins."""
     on_needed("verify started")
 
@@ -199,8 +201,8 @@ def main():
                 "net.reactivated.Fprint.Manager",
             )
             for dev in mgr.GetDevices():
-                p = dbus.Interface(bus.get_object(BUS_NAME, dev), PROPS)
-                if bool(p.Get(DEV_IFACE, "finger-needed")):
+                iface = dbus.Interface(bus.get_object(BUS_NAME, dev), PROPS)
+                if bool(iface.Get(DEV_IFACE, "finger-needed")):
                     on_needed("pending at startup")
         except dbus.DBusException:
             pass
