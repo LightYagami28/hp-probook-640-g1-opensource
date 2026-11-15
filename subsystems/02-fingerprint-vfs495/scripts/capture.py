@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""vfs495 capture: drive HP's validity-sensor (which holds the sensor's secure session)
-under gdb and harvest its motion-compensated assembled fingerprint. Output: PGM.
-Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)"""
+"""Capture one fingerprint swipe through HP's validity-sensor driver.
+
+The driver holds the sensor's secure session, so it is driven under gdb and its
+motion-compensated assembled fingerprint is harvested. Output: PGM.
+
+Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
+"""
 
 import os
 import struct

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""vfs495 bridge (event-driven): stays completely idle until fprintd's device reports
-finger-needed=true (a verify or enroll is waiting for a swipe), then runs ONE capture on
-the real sensor and delivers the image to libfprint's virtual_image socket. When fprintd
-stops needing a finger (timeout, cancel, done) a still-running capture is cancelled, so the
-sensor is never held longer than an authentication actually lasts."""
+"""Event-driven bridge between the vfs495 sensor and fprintd.
+
+It stays completely idle until fprintd's device reports finger-needed=true (a verify or
+enroll is waiting for a swipe), then runs ONE capture on the real sensor and delivers the
+image to libfprint's virtual_image socket. When fprintd stops needing a finger (timeout,
+cancel, done) a still-running capture is cancelled, so the sensor is never held longer
+than an authentication actually lasts.
+"""
 
 import importlib
 import os

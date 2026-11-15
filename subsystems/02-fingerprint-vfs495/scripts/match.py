@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""vfs495-match: fingerprint match scoring, offline, using the same libfprint matcher fprintd uses.
+"""
+Offline fingerprint match scoring with the libfprint matcher that fprintd uses.
 
   vfs495-match IMG1.pgm IMG2.pgm [IMG3.pgm ...]   score every image against every other
   vfs495-match --template FILE IMG.pgm [...]       score images against an fprintd template
@@ -30,7 +31,6 @@ from pathlib import Path
 
 THRESHOLD = 40
 MIN_ROWS = 80
-CAPTURE = "/usr/lib/vfs495-fprint/capture.py"
 CAPTURE_ROOT = Path("/run/vfs495-fprint").resolve()
 
 # --- must happen before libfprint is loaded: private socket + score debug output ---
@@ -48,8 +48,8 @@ _lines = []
 
 def _reader():
     """Collect the libfprint debug lines written to the captured stdout."""
-    with os.fdopen(_r, "rb", 0) as f:
-        for line in f:
+    with os.fdopen(_r, "rb", 0) as stream:
+        for line in stream:
             _lines.append(line.decode(errors="replace"))
 
 
@@ -110,8 +110,11 @@ def pause(seconds):
 
 
 def send_image(img, delay=0.3):
-    """Feed one image to the in-process virtual_image device (from a helper thread, over one
-    persistent connection so the driver never sees a hang-up mid-operation)."""
+    """Feed one image to the in-process virtual_image device.
+
+    The image is sent from a helper thread over one persistent connection, so the driver
+    never sees a hang-up mid-operation.
+    """
     width, height, data = img
 
     def run():
@@ -195,7 +198,7 @@ def install_template(dev, files, imgs):
     if os.geteuid():
         raise SystemExit("--enroll needs root: sudo vfs495-match --enroll IMG...")
     user = os.environ.get("SUDO_USER") or "root"
-    print_ = enroll_from_images(dev, [imgs[f] for f in files], user)
+    print_ = enroll_from_images(dev, [imgs[name] for name in files], user)
     data = bytes(print_.serialize())
     base = f"/var/lib/fprint/{user}/virtual_image/0"
     os.makedirs(base, mode=stat.S_IRWXU, exist_ok=True)
@@ -364,34 +367,68 @@ def score_templates(dev, files, imgs, templates):
         out(
             f"against enrolled template {tpath} ({FPrint.Finger(tmpl.get_finger()).value_nick}):"
         )
-        for f in files:
-            matched, score = verify(dev, tmpl, imgs[f], f)
-            out(f"  {os.path.basename(f):<20} {fmt(matched, score)}")
+        for name in files:
+            matched, score = verify(dev, tmpl, imgs[name], name)
+            out(f"  {os.path.basename(name):<20} {fmt(matched, score)}")
         out("")
 
 
 def score_cross(dev, files, imgs):
     """Enroll each image and verify it against all the others."""
     out("each image enrolled, verified with every other image:")
-    for a in files:
-        tmpl = enroll_from_image(dev, imgs[a], a)
+    for first in files:
+        tmpl = enroll_from_image(dev, imgs[first], first)
         if tmpl is None:
             continue
-        for b in files:
-            if a == b:
+        for second in files:
+            if first == second:
                 continue
-            matched, score = verify(dev, tmpl, imgs[b], b)
+            matched, score = verify(dev, tmpl, imgs[second], second)
             out(
-                f"  enroll {os.path.basename(a):<16} verify {os.path.basename(b):<16} {fmt(matched, score)}"
+                f"  enroll {os.path.basename(first):<16} verify {os.path.basename(second):<16} {fmt(matched, score)}"
             )
 
 
 def drop_short_scans(files, imgs):
     """Remove the scans too short to be usable."""
-    for f in tuple(files):
-        if imgs[f][1] < MIN_ROWS:
-            err(f"{f}: only {imgs[f][1]} rows, not a usable scan (skipped)")
-            files.remove(f)
+    for name in tuple(files):
+        if imgs[name][1] < MIN_ROWS:
+            err(f"{name}: only {imgs[name][1]} rows, not a usable scan (skipped)")
+            files.remove(name)
+
+
+def load_images(files):
+    """Read the scans, drop the unusable ones and return them keyed by file name."""
+    if not files:
+        raise SystemExit("no images given")
+    imgs = {name: read_pgm(name) for name in files}
+    drop_short_scans(files, imgs)
+    if not files:
+        raise SystemExit("no usable images")
+    return imgs
+
+
+def collect_templates(template_file, captured):
+    """Return the (path, data) pairs of the templates the scans are scored against."""
+    if template_file:
+        paths = [template_file]
+    else:
+        paths = find_templates() if captured else []
+    return [(path, read_input(path)) for path in paths]
+
+
+def finish(dev):
+    """Close the persistent connection and the device."""
+    for sock in CONN:
+        sock.close()
+    dev.close_sync(None)
+
+
+def run_scoring(dev, files, imgs, template_file, captured):
+    """Score the images against the templates and against each other."""
+    score_templates(dev, files, imgs, collect_templates(template_file, captured))
+    if len(files) >= 2:
+        score_cross(dev, files, imgs)
 
 
 def main(argv):
@@ -401,35 +438,16 @@ def main(argv):
         out(__doc__)
         return 0
     files, template_file, enroll, captured = parse_args(args)
-    if not files:
-        raise SystemExit("no images given")
-    imgs = {f: read_pgm(f) for f in files}
-    drop_short_scans(files, imgs)
-    if not files:
-        raise SystemExit("no usable images")
+    imgs = load_images(files)
     _, dev = open_device()
     out(
         f"matcher: libfprint {dev.get_driver()} (NBIS bozorth3), threshold {THRESHOLD}\n"
     )
     if enroll:
         install_template(dev, files, imgs)
-        for sock in CONN:
-            sock.close()
-        dev.close_sync(None)
-        return 0
-
-    templates = []
-    if template_file:
-        templates.append((template_file, read_input(template_file)))
-    elif captured:
-        for tpl in find_templates():
-            templates.append((tpl, read_input(tpl)))
-    score_templates(dev, files, imgs, templates)
-    if len(files) >= 2:
-        score_cross(dev, files, imgs)
-    for sock in CONN:
-        sock.close()
-    dev.close_sync(None)
+    else:
+        run_scoring(dev, files, imgs, template_file, captured)
+    finish(dev)
     return 0
 
 
