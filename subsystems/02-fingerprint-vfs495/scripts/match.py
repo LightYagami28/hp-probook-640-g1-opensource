@@ -69,7 +69,7 @@ def out(msg):
 import gi
 
 gi.require_version("FPrint", "2.0")
-from gi.repository import FPrint, GLib  # pylint: disable=wrong-import-position
+from gi.repository import FPrint, Gio, GLib  # pylint: disable=wrong-import-position
 
 
 def input_path(name):
@@ -143,8 +143,6 @@ def enroll_from_image(dev, img, name):
     tmpl = FPrint.Print.new(dev)
     tmpl.set_finger(FPrint.Finger.RIGHT_INDEX)
     tmpl.set_username("vfs495-match")
-    from gi.repository import Gio
-
     canc = Gio.Cancellable()
     stage = {"sent": 1}
 
@@ -166,8 +164,6 @@ def enroll_from_image(dev, img, name):
 
 def enroll_from_images(dev, imgs, user):
     """Build a template from several images, cycling through them for the 5 enroll stages."""
-    from gi.repository import Gio
-
     tmpl = FPrint.Print.new(dev)
     tmpl.set_finger(FPrint.Finger.RIGHT_INDEX)
     tmpl.set_username(user)
@@ -248,28 +244,27 @@ def fmt(matched, score):
     return f"{score:4d}/{THRESHOLD}  {tag}"
 
 
+STUCK_MESSAGE = (
+    "\nEvery scan was tiny. If you did swipe slowly, the sensor is in its stuck state:"
+    " it returns a few\nlines and never waits for a finger. Only a FULL POWER-OFF"
+    " (shut down, wait 10 s, power on) clears it;\na warm reboot does not."
+)
+
+
 def capture_swipe(label, swipe):
     """Capture one swipe; return its height, or None if missed."""
     out(f"{label} get ready... ")
     time.sleep(1.0)  # nosemgrep
     out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")
-    completed = subprocess.run(  # nosec B603
-        ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py", os.fspath(swipe)],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    if completed.returncode:
+    cmd = ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py", os.fspath(swipe)]
+    quiet = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if subprocess.run(cmd, check=False, **quiet).returncode:  # nosec B603
         out(f"{label} nothing captured (missed the swipe?)")
         return None
     width, height, _ = read_pgm(swipe)
     if height < MIN_ROWS:
-        out(
-            f"{label} tiny scan {width}x{height}: swipe too short/fast, or stuck sensor"
-        )
         swipe.unlink()
-    else:
-        out(f"{label} captured {width}x{height} -> {swipe}")
+    out(f"{label} {width}x{height} scan, {swipe}")
     return height
 
 
@@ -285,12 +280,19 @@ def capture_directory(target):
     return directory
 
 
+def set_bridge(action):
+    """Start or stop the vfs495-bridge service."""
+    subprocess.run(  # nosec B603, B607
+        ["systemctl", action, "vfs495-bridge"],
+        check=False,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def capture(count, target):
     """Capture count swipes from the sensor into directory target."""
     directory = capture_directory(target)
-    subprocess.run(
-        ["systemctl", "stop", "vfs495-bridge"], check=False, stderr=subprocess.DEVNULL
-    )  # nosec B603, B607
+    set_bridge("stop")
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)  # nosemgrep
     heights = {}
     try:
@@ -299,18 +301,10 @@ def capture(count, target):
             heights[swipe] = capture_swipe(f"[{i}/{count}]", swipe)
             time.sleep(1.5)  # nosemgrep
     finally:
-        subprocess.run(  # nosec
-            ["systemctl", "start", "vfs495-bridge"],
-            check=False,
-            stderr=subprocess.DEVNULL,
-        )
+        set_bridge("start")
     files = [p for p, h in heights.items() if h is not None and h >= MIN_ROWS]
     if not files and any(h is not None for h in heights.values()):
-        out(
-            "\nEvery scan was tiny. If you did swipe slowly, the sensor is in its stuck state: it returns a few"
-            "\nlines and never waits for a finger. Only a FULL POWER-OFF (shut down, wait 10 s, power on) clears it;"
-            "\na warm reboot does not."
-        )
+        out(STUCK_MESSAGE)
     return files
 
 
