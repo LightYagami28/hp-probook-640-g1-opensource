@@ -249,7 +249,7 @@ def fmt(matched, score):
 
 
 def capture_swipe(label, swipe):
-    """Capture one swipe into the file swipe; return its height, or None if missed."""
+    """Capture one swipe; return its height, or None if missed."""
     out(f"{label} get ready... ")
     time.sleep(1.0)  # nosemgrep
     out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")
@@ -259,7 +259,7 @@ def capture_swipe(label, swipe):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    if completed.returncode != 0:
+    if completed.returncode:
         out(f"{label} nothing captured (missed the swipe?)")
         return None
     width, height, _ = read_pgm(swipe)
@@ -273,8 +273,8 @@ def capture_swipe(label, swipe):
     return height
 
 
-def capture(count, target):
-    """Capture count swipes from the sensor into directory target."""
+def capture_directory(target):
+    """Check the preconditions of --capture and return the target directory."""
     if os.geteuid():
         raise SystemExit("--capture needs root: sudo vfs495-match --capture N")
     if not os.path.exists("/var/lib/vfs495-fprint/validity-sensor-unlocked"):
@@ -282,22 +282,21 @@ def capture(count, target):
     directory = Path(target).expanduser().resolve()
     if not directory.is_relative_to(CAPTURE_ROOT):
         raise SystemExit(f"capture directory must be below {CAPTURE_ROOT}")
+    return directory
+
+
+def capture(count, target):
+    """Capture count swipes from the sensor into directory target."""
+    directory = capture_directory(target)
     subprocess.run(
         ["systemctl", "stop", "vfs495-bridge"], check=False, stderr=subprocess.DEVNULL
     )  # nosec B603, B607
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)  # nosemgrep
-    files = []
-    tiny = []
+    heights = {}
     try:
         for i in range(1, count + 1):
             swipe = directory / f"swipe-{i}.pgm"
-            height = capture_swipe(f"[{i}/{count}]", swipe)
-            if height is None:
-                pass
-            elif height < MIN_ROWS:
-                tiny.append(height)
-            else:
-                files.append(swipe)
+            heights[swipe] = capture_swipe(f"[{i}/{count}]", swipe)
             time.sleep(1.5)  # nosemgrep
     finally:
         subprocess.run(  # nosec
@@ -305,7 +304,8 @@ def capture(count, target):
             check=False,
             stderr=subprocess.DEVNULL,
         )
-    if tiny and not files:
+    files = [p for p, h in heights.items() if h is not None and h >= MIN_ROWS]
+    if not files and any(h is not None for h in heights.values()):
         out(
             "\nEvery scan was tiny. If you did swipe slowly, the sensor is in its stuck state: it returns a few"
             "\nlines and never waits for a finger. Only a FULL POWER-OFF (shut down, wait 10 s, power on) clears it;"

@@ -159,7 +159,7 @@ def on_not_needed():
 
 
 def on_props_changed(
-    iface, changed, invalidated, path=None
+    iface, changed, _invalidated, path=None
 ):  # pylint: disable=unused-argument
     """React to the finger-needed property of the fprintd device."""
     if iface != DEV_IFACE or "finger-needed" not in changed:
