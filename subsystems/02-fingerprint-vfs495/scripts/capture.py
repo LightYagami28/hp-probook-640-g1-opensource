@@ -38,7 +38,7 @@ def main():
     try:
         subprocess.run(
             [
-                "gdb",
+                "/usr/bin/gdb",
                 "-q",
                 "-batch",
                 "-x",
@@ -56,7 +56,7 @@ def main():
         )
     except subprocess.TimeoutExpired:
         subprocess.run(
-            ["pkill", "-9", "-f", "validity-sensor-unlocked"],
+            ["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"],
             check=False,
             stderr=subprocess.DEVNULL,
         )

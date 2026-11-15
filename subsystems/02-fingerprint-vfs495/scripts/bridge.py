@@ -57,7 +57,7 @@ def deliver(width, height, data):
 def run_capture(out):
     """One capture attempt. Returns True if an image was written to `out`."""
     with subprocess.Popen(
-        [sys.executable, CAPTURE, out],
+        ["/usr/bin/python3", CAPTURE, out],
         env={**os.environ, "VFS_TIMEOUT": "70"},
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -81,7 +81,7 @@ def kill_capture():
         except OSError as error:
             log(f"cannot stop the capture process: {error}")
         subprocess.run(
-            ["pkill", "-9", "-f", "validity-sensor-unlocked"],
+            ["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"],
             check=False,
             stderr=subprocess.DEVNULL,
         )

@@ -101,7 +101,13 @@ def read_pgm(name):
         return width, height, handle.read(width * height)
 
 
-CONN = {"sock": None}
+class Connection:
+    """Persistent socket to the virtual_image device."""
+
+    sock: socket.socket | None = None
+
+
+CONN = Connection()
 
 
 def pause(seconds):
@@ -118,13 +124,13 @@ def send_image(img, delay=0.3):
         pause(delay)
         for _ in range(50):
             try:
-                if CONN["sock"] is None:
-                    CONN["sock"] = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    CONN["sock"].connect(SOCK)
-                CONN["sock"].sendall(struct.pack("<ii", width, height) + data)
+                if CONN.sock is None:
+                    CONN.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    CONN.sock.connect(SOCK)
+                CONN.sock.sendall(struct.pack("<ii", width, height) + data)
                 return
             except OSError:
-                CONN["sock"] = None
+                CONN.sock = None
                 pause(0.1)
 
     threading.Thread(target=run, daemon=True).start()
@@ -218,7 +224,9 @@ def install_template(dev, files, imgs):
         matched, score = verify(dev, print_, imgs[name], name)
         out(f"  {os.path.basename(name):<20} {fmt(matched, score)}")
     subprocess.run(
-        ["systemctl", "restart", "fprintd"], check=False, stderr=subprocess.DEVNULL
+        ["/usr/bin/systemctl", "restart", "fprintd"],
+        check=False,
+        stderr=subprocess.DEVNULL,
     )
     out("\nnow test:  fprintd-verify   (wait ~2 s after the prompt, then swipe)")
 
@@ -290,7 +298,7 @@ def capture_directory(target):
 def set_bridge(action):
     """Start or stop the vfs495-bridge service."""
     subprocess.run(
-        ["systemctl", action, "vfs495-bridge"],
+        ["/usr/bin/systemctl", action, "vfs495-bridge"],
         check=False,
         stderr=subprocess.DEVNULL,
     )
@@ -298,8 +306,8 @@ def set_bridge(action):
 
 def usable_swipes(heights):
     """Return the swipes tall enough to score, warning when all of them were tiny."""
-    files = [p for p, h in heights.items() if h is not None and h >= MIN_ROWS]
-    if not files and any(h is not None for h in heights.values()):
+    files = [path for path, rows in heights.items() if (rows or 0) >= MIN_ROWS]
+    if not files and any(heights.values()):
         out(STUCK_MESSAGE)
     return files
 
@@ -405,8 +413,8 @@ def main(argv):
     )
     if enroll:
         install_template(dev, files, imgs)
-        if CONN["sock"]:
-            CONN["sock"].close()
+        if CONN.sock:
+            CONN.sock.close()
         dev.close_sync(None)
         return 0
 
@@ -419,8 +427,8 @@ def main(argv):
     score_templates(dev, files, imgs, templates)
     if len(files) >= 2:
         score_cross(dev, files, imgs)
-    if CONN["sock"]:
-        CONN["sock"].close()
+    if CONN.sock:
+        CONN.sock.close()
     dev.close_sync(None)
     return 0
 
