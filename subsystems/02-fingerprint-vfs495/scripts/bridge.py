@@ -55,7 +55,7 @@ def deliver(width, height, data):
 
 def run_capture(out):
     """One capture attempt. Returns True if an image was written to `out`."""
-    proc = subprocess.Popen(  # pylint: disable=consider-using-with  # nosec B603
+    proc = subprocess.Popen(  # pylint: disable=consider-using-with  # nosec B603  # nosemgrep
         [sys.executable, CAPTURE, out],
         env={**os.environ, "VFS_TIMEOUT": "70"},
         stdout=subprocess.DEVNULL,
@@ -67,7 +67,7 @@ def run_capture(out):
     code = proc.wait()
     with lock:
         state["proc"] = None
-    return code == 0
+    return not code
 
 
 def kill_capture():

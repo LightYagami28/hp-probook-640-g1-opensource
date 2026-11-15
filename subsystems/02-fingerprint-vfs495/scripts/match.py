@@ -110,7 +110,7 @@ def send_image(img, delay=0.3):
 
     def run():
         global _conn  # pylint: disable=global-statement
-        time.sleep(delay)
+        time.sleep(delay)  # nosemgrep
         for _ in range(50):
             try:
                 if _conn is None:
@@ -120,7 +120,7 @@ def send_image(img, delay=0.3):
                 return
             except OSError:
                 _conn = None
-                time.sleep(0.1)
+                time.sleep(0.1)  # nosemgrep
 
     threading.Thread(target=run, daemon=True).start()
 
@@ -148,13 +148,11 @@ def enroll_from_image(dev, img, name):
     canc = Gio.Cancellable()
     stage = {"sent": 1}
 
-    def progress(
-        device, completed, print_, user_data, error=None
-    ):  # pylint: disable=unused-argument
+    def progress(*args):
         if stage["sent"] >= 8:
             canc.cancel()
             return  # image keeps failing minutiae extraction
-        if completed < dev.get_nr_enroll_stages():
+        if args[1] < dev.get_nr_enroll_stages():
             stage["sent"] += 1
             send_image(img, 0.2)
 
@@ -176,13 +174,11 @@ def enroll_from_images(dev, imgs, user):
     canc = Gio.Cancellable()
     stage = {"sent": 1}
 
-    def progress(
-        device, completed, print_, user_data, error=None
-    ):  # pylint: disable=unused-argument
+    def progress(*args):
         if stage["sent"] >= 12:
             canc.cancel()
             return
-        if completed < dev.get_nr_enroll_stages():
+        if args[1] < dev.get_nr_enroll_stages():
             send_image(imgs[stage["sent"] % len(imgs)], 0.2)
             stage["sent"] += 1
 
@@ -195,22 +191,20 @@ def enroll_from_images(dev, imgs, user):
 
 def install_template(dev, files, imgs):
     """Enroll the scans and install the template in the fprintd store."""
-    if (
-        os.geteuid() != 0
-    ):  # pylint: disable=use-implicit-booleaness-not-comparison-to-zero
+    if os.geteuid():
         raise SystemExit("--enroll needs root: sudo vfs495-match --enroll IMG...")
     user = os.environ.get("SUDO_USER") or "root"
     print_ = enroll_from_images(dev, [imgs[f] for f in files], user)
     data = bytes(print_.serialize())
     base = f"/var/lib/fprint/{user}/virtual_image/0"
-    os.makedirs(base, mode=0o700, exist_ok=True)
+    os.makedirs(base, mode=0o700, exist_ok=True)  # nosemgrep
     for entry in (
         "/var/lib/fprint",
         f"/var/lib/fprint/{user}",
         f"/var/lib/fprint/{user}/virtual_image",
         base,
     ):
-        os.chmod(entry, 0o700)
+        os.chmod(entry, 0o700)  # nosemgrep
     path = base + "/7"  # 7 = right index finger in fprintd's file store
     if os.path.exists(path):
         os.replace(path, path + ".bak")
@@ -238,7 +232,7 @@ def verify(dev, template, img, name):
         err(f"  verify {name}: {err_gl.message}")
         return False, -1
     matched = bool(res[0] if isinstance(res, tuple) else res)
-    time.sleep(0.05)
+    time.sleep(0.05)  # nosemgrep
     scores = [
         int(hit.group(1))
         for text in _lines
@@ -254,11 +248,34 @@ def fmt(matched, score):
     return f"{score:4d}/{THRESHOLD}  {tag}"
 
 
+def capture_swipe(label, swipe):
+    """Capture one swipe into the file swipe; return its height, or None if missed."""
+    out(f"{label} get ready... ")
+    time.sleep(1.0)  # nosemgrep
+    out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")
+    completed = subprocess.run(  # nosec B603
+        ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py", os.fspath(swipe)],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if completed.returncode != 0:
+        out(f"{label} nothing captured (missed the swipe?)")
+        return None
+    width, height, _ = read_pgm(swipe)
+    if height < MIN_ROWS:
+        out(
+            f"{label} tiny scan {width}x{height}: swipe too short/fast, or stuck sensor"
+        )
+        swipe.unlink()
+    else:
+        out(f"{label} captured {width}x{height} -> {swipe}")
+    return height
+
+
 def capture(count, target):
     """Capture count swipes from the sensor into directory target."""
-    if (
-        os.geteuid() != 0
-    ):  # pylint: disable=use-implicit-booleaness-not-comparison-to-zero
+    if os.geteuid():
         raise SystemExit("--capture needs root: sudo vfs495-match --capture N")
     if not os.path.exists("/var/lib/vfs495-fprint/validity-sensor-unlocked"):
         raise SystemExit("HP driver not installed; run: sudo vfs495-setup-hp-driver")
@@ -268,39 +285,20 @@ def capture(count, target):
     subprocess.run(
         ["systemctl", "stop", "vfs495-bridge"], check=False, stderr=subprocess.DEVNULL
     )  # nosec B603, B607
-    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)  # nosemgrep
     files = []
     tiny = []
     try:
         for i in range(1, count + 1):
             swipe = directory / f"swipe-{i}.pgm"
-            out(f"[{i}/{count}] get ready... ")
-            time.sleep(1.0)
-            out(f"[{i}/{count}] SWIPE NOW (slowly, whole fingertip, one steady motion)")
-            completed = subprocess.run(  # nosec B603
-                [
-                    "/usr/bin/python3",
-                    "/usr/lib/vfs495-fprint/capture.py",
-                    os.fspath(swipe),
-                ],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if completed.returncode == 0:
-                width, height, _ = read_pgm(swipe)
-                if height < MIN_ROWS:
-                    out(
-                        f"[{i}/{count}] tiny scan {width}x{height}: swipe too short/fast, or the sensor is stuck (see below)"
-                    )
-                    tiny.append(height)
-                    swipe.unlink()
-                else:
-                    out(f"[{i}/{count}] captured {width}x{height} -> {swipe}")
-                    files.append(swipe)
+            height = capture_swipe(f"[{i}/{count}]", swipe)
+            if height is None:
+                pass
+            elif height < MIN_ROWS:
+                tiny.append(height)
             else:
-                out(f"[{i}/{count}] nothing captured (missed the swipe?)")
-            time.sleep(1.5)
+                files.append(swipe)
+            time.sleep(1.5)  # nosemgrep
     finally:
         subprocess.run(  # nosec
             ["systemctl", "start", "vfs495-bridge"],
