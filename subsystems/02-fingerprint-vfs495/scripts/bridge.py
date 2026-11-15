@@ -4,6 +4,7 @@ finger-needed=true (a verify or enroll is waiting for a swipe), then runs ONE ca
 the real sensor and delivers the image to libfprint's virtual_image socket. When fprintd
 stops needing a finger (timeout, cancel, done) a still-running capture is cancelled, so the
 sensor is never held longer than an authentication actually lasts."""
+
 import os
 import signal
 import socket
@@ -19,41 +20,71 @@ from gi.repository import GLib  # pyright: ignore[reportMissingImports]
 
 SOCK = os.environ.get("FP_VIRTUAL_IMAGE", "/run/fprint/virtimg_sock")
 CAPTURE = "/usr/lib/vfs495-fprint/capture.py"
-MIN_ROWS = 80                                # a real swipe assembles to ~200x300; tiny = no usable print
-RUN = "/run/vfs495-fprint"                  # tmpfs, root only; last.pgm = most recent capture (debugging)
+MIN_ROWS = 80  # a real swipe assembles to ~200x300; tiny = no usable print
+RUN = (
+    "/run/vfs495-fprint"  # tmpfs, root only; last.pgm = most recent capture (debugging)
+)
 BUS_NAME, DEV_IFACE = "net.reactivated.Fprint", "net.reactivated.Fprint.Device"
 PROPS = "org.freedesktop.DBus.Properties"
 lock = threading.Lock()
 state = {"proc": None, "capturing": False, "wanted": False, "gen": 0}
 
-def log(m): print("[vfs495-bridge] " + m, file=sys.stderr, flush=True)
+
+def log(m):
+    """Write a tagged line to stderr."""
+    print("[vfs495-bridge] " + m, file=sys.stderr, flush=True)
+
 
 def read_pgm(p):
+    """Read a binary PGM file and return (width, height, pixels)."""
     with open(p, "rb") as f:
-        assert f.readline().strip() == b"P5"; w, h = map(int, f.readline().split()); f.readline()
+        if f.readline().strip() != b"P5":
+            raise ValueError("not a binary PGM (P5)")
+        w, h = map(int, f.readline().split())
+        f.readline()
         return w, h, f.read(w * h)
 
+
 def deliver(w, h, data):
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(SOCK)
-    s.sendall(struct.pack("<ii", w, h) + data); s.close()
+    """Send one image to the libfprint virtual_image socket."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(SOCK)
+    s.sendall(struct.pack("<ii", w, h) + data)
+    s.close()
+
 
 def run_capture(out):
     """One capture attempt. Returns True if an image was written to `out`."""
-    p = subprocess.Popen([sys.executable, CAPTURE, out], env={**os.environ, "VFS_TIMEOUT": "70"},
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    with lock: state["proc"] = p
+    p = subprocess.Popen(
+        [sys.executable, CAPTURE, out],
+        env={**os.environ, "VFS_TIMEOUT": "70"},
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    with lock:
+        state["proc"] = p
     rc = p.wait()
-    with lock: state["proc"] = None
+    with lock:
+        state["proc"] = None
     return rc == 0
 
+
 def kill_capture():
-    with lock: p = state["proc"]
+    """Terminate a running capture and the HP sensor process."""
+    with lock:
+        p = state["proc"]
     if p and p.poll() is None:
-        try: os.killpg(p.pid, signal.SIGTERM)
-        except OSError: pass
+        try:
+            os.killpg(p.pid, signal.SIGTERM)
+        except OSError:
+            pass
         subprocess.run(  # nosec
             ["pkill", "-9", "-f", "validity-sensor-unlocked"],
-            check=False, stderr=subprocess.DEVNULL)
+            check=False,
+            stderr=subprocess.DEVNULL,
+        )
+
 
 def capture_is_current(gen):
     """Return whether this generation is still the capture fprintd wants."""
@@ -70,8 +101,10 @@ def deliver_capture(out, last, gen, started):
     img = read_pgm(out)
     os.replace(out, last)
     if img[1] < MIN_ROWS:
-        log(f"sensor returned a tiny scan ({img[0]}x{img[1]}): swipe too short/fast, or the sensor is in "
-            "its stuck state (then: full power-off, not a reboot)")
+        log(
+            f"sensor returned a tiny scan ({img[0]}x{img[1]}): swipe too short/fast, or the sensor is in "
+            "its stuck state (then: full power-off, not a reboot)"
+        )
         return False
     try:
         deliver(*img)
@@ -83,55 +116,100 @@ def deliver_capture(out, last, gen, started):
 
 
 def capture_and_deliver(gen):
+    """Run up to two capture attempts for this generation."""
     os.makedirs(RUN, mode=0o700, exist_ok=True)
     out, last = RUN + "/cap.pgm", RUN + "/last.pgm"
     try:
         for attempt in range(2):
             if deliver_capture(out, last, gen, time.monotonic()):
                 return
-            log("no usable finger scan" + (", retrying" if not attempt else " (give up)"))
+            log(
+                "no usable finger scan"
+                + (", retrying" if not attempt else " (give up)")
+            )
     finally:
-        try: os.unlink(out)
-        except OSError: pass
+        try:
+            os.unlink(out)
+        except OSError:
+            pass
         state["capturing"] = False
 
+
 def on_needed(reason):
+    """Start a capture when fprintd asks for a finger."""
     state["wanted"] = True
-    if state["capturing"]: return
-    state["capturing"] = True; state["gen"] += 1
+    if state["capturing"]:
+        return
+    state["capturing"] = True
+    state["gen"] += 1
     log(f"finger needed ({reason}) -> capturing; swipe now")
-    threading.Thread(target=capture_and_deliver, args=(state["gen"],), daemon=True).start()
+    threading.Thread(
+        target=capture_and_deliver, args=(state["gen"],), daemon=True
+    ).start()
+
 
 def on_not_needed():
-    if not state["wanted"]: return
+    """Cancel the running capture when fprintd no longer needs a finger."""
+    if not state["wanted"]:
+        return
     state["wanted"] = False
     if state["capturing"]:
-        state["gen"] += 1; kill_capture()
+        state["gen"] += 1
+        kill_capture()
+
 
 def on_props_changed(iface, changed, invalidated, path=None):
-    if iface != DEV_IFACE or "finger-needed" not in changed: return
-    if bool(changed["finger-needed"]): on_needed("finger-needed")
-    else: on_not_needed()
+    """React to the finger-needed property of the fprintd device."""
+    if iface != DEV_IFACE or "finger-needed" not in changed:
+        return
+    if bool(changed["finger-needed"]):
+        on_needed("finger-needed")
+    else:
+        on_not_needed()
 
-def on_verify_selected(*args, path=None): on_needed("verify started")
+
+def on_verify_selected(*args, path=None):
+    """Start a capture when a verify begins."""
+    on_needed("verify started")
+
 
 def main():
+    """Subscribe to the fprintd signals and run the GLib main loop."""
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SystemBus()
-    bus.add_signal_receiver(on_props_changed, signal_name="PropertiesChanged", dbus_interface=PROPS,
-                            bus_name=BUS_NAME, path_keyword="path")
-    bus.add_signal_receiver(on_verify_selected, signal_name="VerifyFingerSelected", dbus_interface=DEV_IFACE,
-                            bus_name=BUS_NAME, path_keyword="path")
-    def check_initial():                                # a scan already pending at startup?
+    bus.add_signal_receiver(
+        on_props_changed,
+        signal_name="PropertiesChanged",
+        dbus_interface=PROPS,
+        bus_name=BUS_NAME,
+        path_keyword="path",
+    )
+    bus.add_signal_receiver(
+        on_verify_selected,
+        signal_name="VerifyFingerSelected",
+        dbus_interface=DEV_IFACE,
+        bus_name=BUS_NAME,
+        path_keyword="path",
+    )
+
+    def check_initial():  # a scan already pending at startup?
         try:
-            mgr = dbus.Interface(bus.get_object(BUS_NAME, "/net/reactivated/Fprint/Manager"), "net.reactivated.Fprint.Manager")
+            mgr = dbus.Interface(
+                bus.get_object(BUS_NAME, "/net/reactivated/Fprint/Manager"),
+                "net.reactivated.Fprint.Manager",
+            )
             for dev in mgr.GetDevices():
                 p = dbus.Interface(bus.get_object(BUS_NAME, dev), PROPS)
-                if bool(p.Get(DEV_IFACE, "finger-needed")): on_needed("pending at startup")
-        except dbus.DBusException: pass
+                if bool(p.Get(DEV_IFACE, "finger-needed")):
+                    on_needed("pending at startup")
+        except dbus.DBusException:
+            pass
         return False
+
     GLib.timeout_add(1500, check_initial)
     log("idle; waiting for fprintd to need a finger")
     GLib.MainLoop().run()
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()

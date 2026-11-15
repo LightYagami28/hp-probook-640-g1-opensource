@@ -2,6 +2,7 @@
 """vfs495 capture: drive HP's validity-sensor (which holds the sensor's secure session)
 under gdb and harvest its motion-compensated assembled fingerprint. Output: PGM.
 Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)"""
+
 import os
 import struct
 import subprocess  # nosec B404
@@ -9,7 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-HP = "/var/lib/vfs495-fprint"          # HP binary + shim libs (installed by setup-hp-driver.sh)
+HP = "/var/lib/vfs495-fprint"  # HP binary + shim libs (installed by setup-hp-driver.sh)
 LIB = "/usr/lib/vfs495-fprint"
 OUTPUT_ROOT = Path("/run/vfs495-fprint")
 
@@ -24,7 +25,9 @@ def output_path(value):
 
 
 def main():
-    if len(sys.argv) < 2: sys.exit("usage: vfs495-capture OUT.pgm")
+    """Capture one swipe through the HP driver and write it as a PGM."""
+    if len(sys.argv) < 2:
+        sys.exit("usage: vfs495-capture OUT.pgm")
     out = output_path(sys.argv[1])
     binp = HP + "/validity-sensor-unlocked"
     if not os.path.exists(binp):
@@ -33,27 +36,49 @@ def main():
     os.close(descriptor)
     env = {**os.environ, "LD_LIBRARY_PATH": HP + "/lib", "VFS_ASM_OUT": asm}
     try:
-        subprocess.run(["gdb", "-q", "-batch", "-x", LIB + "/harvest_assembled.py",  # nosec B603, B607
-                        "--args", binp, "getprintwait", "-doinit"],
-                       check=False, env=env, timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                "gdb",
+                "-q",
+                "-batch",
+                "-x",
+                LIB + "/harvest_assembled.py",  # nosec B603, B607
+                "--args",
+                binp,
+                "getprintwait",
+                "-doinit",
+            ],
+            check=False,
+            env=env,
+            timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except subprocess.TimeoutExpired:
         subprocess.run(  # nosec
             ["pkill", "-9", "-f", "validity-sensor-unlocked"],
-            check=False, stderr=subprocess.DEVNULL)
+            check=False,
+            stderr=subprocess.DEVNULL,
+        )
     try:
         with open(asm, "rb") as handle:
             data = handle.read()
     finally:
-        try: os.unlink(asm)
-        except OSError: pass
+        try:
+            os.unlink(asm)
+        except OSError:
+            pass
     if len(data) < 16:
-        print("no finger captured", file=sys.stderr); return 10
+        print("no finger captured", file=sys.stderr)
+        return 10
     width, height = struct.unpack("<II", data[:8])
-    pixels = data[8:8 + width * height]
+    pixels = data[8 : 8 + width * height]
     with out.open("wb") as pgm_file:
         pgm_file.write(f"P5\n{width} {height}\n255\n".encode())
         pgm_file.write(pixels)
     print(f"captured {width}x{height} -> {out}")
     return 0
-if __name__ == "__main__": sys.exit(main())
+
+
+if __name__ == "__main__":
+    sys.exit(main())
