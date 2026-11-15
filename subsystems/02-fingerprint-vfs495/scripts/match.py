@@ -101,13 +101,7 @@ def read_pgm(name):
         return width, height, handle.read(width * height)
 
 
-class Connection:
-    """Persistent socket to the virtual_image device."""
-
-    sock: socket.socket | None = None
-
-
-CONN = Connection()
+CONN: list[socket.socket] = []
 
 
 def pause(seconds):
@@ -124,13 +118,13 @@ def send_image(img, delay=0.3):
         pause(delay)
         for _ in range(50):
             try:
-                if CONN.sock is None:
-                    CONN.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    CONN.sock.connect(SOCK)
-                CONN.sock.sendall(struct.pack("<ii", width, height) + data)
+                if not CONN:
+                    CONN.append(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM))
+                    CONN[0].connect(SOCK)
+                CONN[0].sendall(struct.pack("<ii", width, height) + data)
                 return
             except OSError:
-                CONN.sock = None
+                CONN.clear()
                 pause(0.1)
 
     threading.Thread(target=run, daemon=True).start()
@@ -304,11 +298,17 @@ def set_bridge(action):
     )
 
 
+def warn_tiny(heights):
+    """Explain the stuck sensor state when every scan was tiny."""
+    if any(heights.values()):
+        out(STUCK_MESSAGE)
+
+
 def usable_swipes(heights):
     """Return the swipes tall enough to score, warning when all of them were tiny."""
     files = [path for path, rows in heights.items() if (rows or 0) >= MIN_ROWS]
-    if not files and any(heights.values()):
-        out(STUCK_MESSAGE)
+    if not files:
+        warn_tiny(heights)
     return files
 
 
@@ -413,8 +413,8 @@ def main(argv):
     )
     if enroll:
         install_template(dev, files, imgs)
-        if CONN.sock:
-            CONN.sock.close()
+        for sock in CONN:
+            sock.close()
         dev.close_sync(None)
         return 0
 
@@ -427,8 +427,8 @@ def main(argv):
     score_templates(dev, files, imgs, templates)
     if len(files) >= 2:
         score_cross(dev, files, imgs)
-    if CONN.sock:
-        CONN.sock.close()
+    for sock in CONN:
+        sock.close()
     dev.close_sync(None)
     return 0
 

@@ -318,7 +318,7 @@ def test_read_pgm_and_short_scan_filter(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "open_device", lambda: (None, device))
     monkeypatch.setattr(module, "out", lambda message: None)
     monkeypatch.setattr(module, "err", lambda message: None)
-    monkeypatch.setattr(module.CONN, "sock", None)
+    monkeypatch.setattr(module, "CONN", [])
     assert module.main(["vfs495-match", str(good), str(short)]) == 0
     device.close_sync.assert_called_once()
 
@@ -405,7 +405,7 @@ def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "open_device", lambda: (None, device))
     monkeypatch.setattr(module, "out", lambda message: None)
     monkeypatch.setattr(module, "err", lambda message: None)
-    monkeypatch.setattr(module.CONN, "sock", None)
+    monkeypatch.setattr(module, "CONN", [])
     monkeypatch.setattr(module, "verify", lambda *args: (True, 50))
     monkeypatch.setattr(module, "enroll_from_image", lambda dev, image, name: None if name == str(img2) else object())
     assert module.main(["m", "--template", str(tmpl), str(img), str(img2)]) == 0
@@ -435,7 +435,7 @@ def test_main_enroll_installs_template(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "open_device", lambda: (None, MagicMock()))
     monkeypatch.setattr(module, "out", lambda message: None)
     monkeypatch.setattr(module, "install_template", lambda *args: installed.append(args))
-    monkeypatch.setattr(module.CONN, "sock", conn)
+    monkeypatch.setattr(module, "CONN", [conn])
     assert module.main(["m", "--enroll", str(img)]) == 0
     assert installed
     conn.close.assert_called_once()
@@ -581,7 +581,7 @@ def test_match_send_image_retries_until_socket_accepts(monkeypatch):
         def sendall(self, data):
             attempts.append(data)
 
-    monkeypatch.setattr(module.CONN, "sock", None)
+    monkeypatch.setattr(module, "CONN", [])
     monkeypatch.setattr(module, "pause", lambda *args: None)
     monkeypatch.setattr(module, "socket", types.SimpleNamespace(AF_UNIX=1, SOCK_STREAM=1, socket=lambda *args: Sock()))
     monkeypatch.setattr(
@@ -590,7 +590,7 @@ def test_match_send_image_retries_until_socket_accepts(monkeypatch):
     )
     module.send_image((2, 1, b"ab"))
     assert attempts[-1] == struct.pack("<ii", 2, 1) + b"ab"
-    module.CONN.sock = None
+    module.CONN.clear()
 
 
 def test_match_open_device_and_enroll(monkeypatch):
