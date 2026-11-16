@@ -1,0 +1,19 @@
+# Etichette per percorso, applicate da actions/labeler (.github/workflows/labeler.yml).
+documentazione:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+dipendenze:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/dependabot.yml'
+qualità:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'
+          - 'sonar-project.properties'
+sicurezza:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'SECURITY.md'
+          - 'security_and_flashing/**'
