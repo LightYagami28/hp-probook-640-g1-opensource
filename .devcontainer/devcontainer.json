@@ -1,0 +1,8 @@
+{
+  "name": "HP ProBook 640 G1",
+  "image": "mcr.microsoft.com/devcontainers/python:3",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "postCreateCommand": "pip install pytest pytest-cov"
+}
