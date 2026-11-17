@@ -47,5 +47,5 @@ Il port coreboot è GPL-2.0-only; altri materiali hanno titolari diversi. Leggi
 ## Dove chiedo aiuto?
 
 Nelle discussioni del repository:
-https://github.com/LightYagami28/hp-probook-640-g1-opensource/discussions
+<https://github.com/LightYagami28/hp-probook-640-g1-opensource/discussions>
 Per le vulnerabilità vedi [SECURITY.md](SECURITY.md).
