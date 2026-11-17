@@ -1,6 +1,8 @@
 # Documentazione
 
-Indice del progetto di porting hardware e firmware. I documenti descrivono l'hardware osservato e il lavoro nel repository; verificare sempre le avvertenze prima di intervenire sul dispositivo.
+Indice del progetto di porting hardware e firmware. I documenti descrivono
+l'hardware osservato e il lavoro nel repository; verificare sempre le avvertenze
+prima di intervenire sul dispositivo.
 
 - [README: scheda tecnica e panoramica del repository](../README.md)
 - [SPEC: ambito, componenti e limiti](../SPEC.md)

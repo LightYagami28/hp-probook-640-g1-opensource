@@ -1,7 +1,7 @@
 # Glossario
 
 | Termine | Significato |
-|---|---|
+| --- | --- |
 | coreboot | Firmware libero che sostituisce il BIOS/UEFI del produttore. |
 | SeaBIOS / EDK2 | Payload che coreboot avvia dopo l'inizializzazione dell'hardware. |
 | PCH | Chipset di piattaforma Intel (qui HM87 Lynx Point). |
