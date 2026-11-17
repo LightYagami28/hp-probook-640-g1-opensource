@@ -213,3 +213,7 @@ coreboot 26.09 (crossgcc: GCC 15.2.0, binutils 2.46.1, IASL 20251212), flashrom
 - Dump hardware e tabelle ACPI decompilate: non coperti dalla GPL, diritti dei
   rispettivi titolari; seriali e UUID oscurati.
 - Dettagli, file esclusi e marchi: [`NOTICE.md`](NOTICE.md).
+
+## Documentazione
+
+[Indice documentazione](docs/README.md).
