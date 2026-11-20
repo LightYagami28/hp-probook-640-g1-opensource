@@ -47,7 +47,10 @@ titolare del repository).
 
 ## 4. Documentazione
 
-- Le guide tecniche, i documenti di analisi hardware (`subsystems/`), gli schemi di piedinatura, la procedura di flash e le note descrittive scritte dall'autore sono rilasciate sotto licenza Creative Commons Attribuzione - Condividi allo stesso modo 4.0 Internazionale (CC BY-SA 4.0).
+- Le guide tecniche, i documenti di analisi hardware (`subsystems/`),
+  gli schemi di piedinatura, la procedura di flash e le note descrittive
+  scritte dall'autore sono rilasciate sotto licenza Creative Commons
+  Attribuzione - Condividi allo stesso modo 4.0 Internazionale (CC BY-SA 4.0).
 - Consulta il testo legale completo su `https://creativecommons.org/licenses/by-sa/4.0/legalcode.it`.
 - Titolare del copyright: Alessandro Maule (Light Yagami), 2026.
 

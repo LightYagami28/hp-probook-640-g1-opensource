@@ -1,5 +1,8 @@
 # HP ProBook 640 G1 Open-Source Firmware & Hardware Porting Project
 
+<!-- markdownlint-disable-next-line MD013 -->
+![CI](https://github.com/LightYagami28/hp-probook-640-g1-opensource/actions/workflows/ci.yml/badge.svg) ![License](https://img.shields.io/github/license/LightYagami28/hp-probook-640-g1-opensource) ![Stars](https://img.shields.io/github/stars/LightYagami28/hp-probook-640-g1-opensource)
+
 Progetto completo di reverse engineering, dump hardware/firmware e porting
 open-source a **Coreboot** per il portatile **HP ProBook 640 G1**.
 
