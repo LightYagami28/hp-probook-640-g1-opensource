@@ -2,7 +2,7 @@
 
 Ogni chiamante passa un eseguibile assoluto e una lista di argomenti separati;
 i valori dinamici (percorso dello swipe o azione di systemctl) vengono convalidati
-prima di costruire la lista. Al posto di ``subprocess`` si usa ``posix_spawn``:
+prima di costruire la lista. Al posto di ``subprocess`` si usa ``fork`` + ``execve``:
 nessuna stringa viene interpretata da una shell e i nomi non sono risolti via PATH.
 """
 
@@ -130,6 +130,22 @@ def _terminate(pid: int) -> int:
     return status
 
 
+def _apply_actions(actions: list[tuple[object, ...]]) -> None:
+    """Applica le redirezioni dei descrittori nel processo figlio."""
+    for action in actions:
+        kind = action[0]
+        if kind == os.POSIX_SPAWN_DUP2:
+            _, source, target = action
+            if source != target:
+                os.dup2(source, target)
+        elif kind == os.POSIX_SPAWN_OPEN:
+            _, target, path, flags, mode = action
+            opened = os.open(path, flags, mode)
+            if opened != target:
+                os.dup2(opened, target)
+                os.close(opened)
+
+
 def spawn(
     argv: list[str],
     env: dict[str, str] | None = None,
@@ -141,8 +157,9 @@ def spawn(
         raise ValueError("lista di argomenti vuota")
     if not argv[0].startswith("/"):
         raise ValueError("l'eseguibile deve essere un percorso assoluto")
-    if argv[0] not in EXECUTABILI_CONSENTITI:
-        raise ValueError(f"eseguibile non consentito: {argv[0]}")
+    executable = argv[0]
+    if executable not in EXECUTABILI_CONSENTITI:
+        raise ValueError(f"eseguibile non consentito: {executable}")
 
     actions = []
     for fd_no, target in ((1, stdout), (2, stderr)):
@@ -153,12 +170,15 @@ def spawn(
         elif target is not None:
             actions.append((os.POSIX_SPAWN_DUP2, target, fd_no))
 
-    pid = os.posix_spawn(
-        argv[0],
-        list(argv),
-        dict(os.environ if env is None else env),
-        file_actions=actions,
-    )
+    child_env = dict(os.environ if env is None else env)
+    child_argv = list(argv)
+    pid = os.fork()
+    if pid == 0:
+        try:
+            _apply_actions(actions)
+            os.execve(executable, child_argv, child_env)
+        except BaseException:
+            os._exit(127)
     return ChildProcess(pid)
 
 
