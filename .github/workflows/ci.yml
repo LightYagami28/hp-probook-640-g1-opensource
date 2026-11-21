@@ -48,9 +48,19 @@ jobs:
       - name: Unit tests with coverage
         run: |
           python3 -m venv .venv
-          .venv/bin/pip install pytest pytest-cov
+          .venv/bin/pip install pytest pytest-cov bandit pip-audit ruff mypy shellcheck-py
           .venv/bin/pytest --cov=subsystems/02-fingerprint-vfs495/scripts \
             --cov-report=xml:coverage.xml --cov-report=term-missing
+      - name: Ruff
+        run: .venv/bin/ruff check .
+      - name: Mypy
+        run: .venv/bin/mypy subsystems/02-fingerprint-vfs495/scripts
+      - name: Bandit
+        run: .venv/bin/bandit -r subsystems/02-fingerprint-vfs495/scripts -q
+      - name: Pip-audit
+        run: .venv/bin/pip-audit
+      - name: ShellCheck
+        run: .venv/bin/shellcheck subsystems/02-fingerprint-vfs495/scripts/*.sh
       # Il segreto SONAR_TOKEN manca nelle PR da fork: l'analisi si salta.
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''

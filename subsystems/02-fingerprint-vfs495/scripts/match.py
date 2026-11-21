@@ -44,7 +44,7 @@ _orig_stdout = os.dup(1)
 _r, _w = os.pipe()
 os.dup2(_w, 1)
 os.close(_w)
-_lines = []
+_lines: list[str] = []
 
 
 def _reader():
