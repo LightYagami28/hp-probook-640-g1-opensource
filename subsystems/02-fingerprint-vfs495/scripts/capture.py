@@ -7,6 +7,8 @@ motion-compensated assembled fingerprint is harvested. Output: PGM.
 Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
 """
 
+import logging
+import logging.config
 import os
 import struct
 import sys
@@ -18,6 +20,29 @@ from exec_command import CommandTimeout, execute
 HP = "/var/lib/vfs495-fprint"  # HP binary + shim libs (installed by setup-hp-driver.sh)
 LIB = "/usr/lib/vfs495-fprint"
 OUTPUT_ROOT = Path("/run/vfs495-fprint")
+
+logging.config.dictConfig(
+    {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {"vfs": {"format": "[vfs495-capture] %(message)s"}},
+        "handlers": {
+            "stderr": {
+                "class": "logging.StreamHandler",
+                "formatter": "vfs",
+                "stream": "ext://sys.stderr",
+            }
+        },
+        "loggers": {
+            "vfs495-capture": {
+                "handlers": ["stderr"],
+                "level": "INFO",
+                "propagate": False,
+            }
+        },
+    }
+)
+LOGGER = logging.getLogger("vfs495-capture")
 
 
 def output_path(value):
@@ -62,7 +87,7 @@ def take_harvest(asm):
         try:
             os.unlink(asm)
         except OSError as error:
-            print(f"cannot remove {asm}: {error}", file=sys.stderr)
+            LOGGER.warning("cannot remove %s: %s", asm, error)
 
 
 def write_pgm(out, data):
@@ -87,10 +112,10 @@ def main():
     run_driver(binp, asm)
     data = take_harvest(asm)
     if len(data) < 16:
-        print("no finger captured", file=sys.stderr)
+        LOGGER.error("no finger captured")
         return 10
     width, height = write_pgm(out, data)
-    print(f"captured {width}x{height} -> {out}")
+    LOGGER.info("captured %dx%d -> %s", width, height, out)
     return 0
 
 

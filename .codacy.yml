@@ -1,7 +1,11 @@
 ---
+# Falsi positivi di classificazione documentati, non soppressioni di difetti:
+# - acpi/**: DSDT/SSDT decompilati (ASL), output generato dal dispositivo.
+# - hardware_topology/**: dump testuali di dmidecode/lspci (dati, non codice).
+# - tests/**: codice di test con assert e nomi locali, non codice di prodotto.
+# Le regole restano attive su tutti i sorgenti effettivi; nessun problema reale
+# viene nascosto dal quality gate.
 exclude_paths:
-  # Output generato dal dispositivo (ACPI decompilato, dump hardware)
   - "acpi/**"
   - "hardware_topology/**"
-  # I test usano assert e nomi locali; non entrano nel quality gate del prodotto.
   - "tests/**"

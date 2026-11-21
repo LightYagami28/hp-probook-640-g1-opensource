@@ -6,14 +6,19 @@
 import importlib
 import os
 import struct
+from typing import Any
 
 gdb = importlib.import_module("gdb")
 
 OUT = os.environ["VFS_ASM_OUT"]
 hit = {"n": 0, "errors": 0}
 
+# gdb e' caricato a runtime: il tipo della classe base e' dichiarato esplicitamente
+# per il controllo statico, senza ignorare gli errori di tipizzazione.
+Breakpoint: type[Any] = gdb.Breakpoint
 
-class BP(gdb.Breakpoint):
+
+class BP(Breakpoint):
     """Breakpoint that dumps the assembled fingerprint image."""
 
     def stop(self):

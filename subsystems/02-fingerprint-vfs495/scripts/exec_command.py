@@ -2,8 +2,9 @@
 
 Ogni chiamante passa un eseguibile assoluto e una lista di argomenti separati;
 i valori dinamici (percorso dello swipe o azione di systemctl) vengono convalidati
-prima di costruire la lista. Al posto di ``subprocess`` si usa ``fork`` + ``execve``:
-nessuna stringa viene interpretata da una shell e i nomi non sono risolti via PATH.
+prima di costruire la lista. Al posto di ``fork`` + ``execve`` si usa
+``posix_spawn`` con file_actions: nessuna stringa viene interpretata da una shell,
+i nomi non sono risolti via PATH e nel figlio non corre codice Python.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import os
 import signal
 import time
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Self
 
 DEVNULL = object()
 
@@ -44,7 +45,8 @@ class ChildProcess:
     pid: int
     _status: int | None = None
 
-    def __enter__(self) -> ChildProcess:
+    def __enter__(self) -> Self:
+        """Restituisce il processo come context manager, pronto per l'attesa."""
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -130,22 +132,6 @@ def _terminate(pid: int) -> int:
     return status
 
 
-def _apply_actions(actions: list[tuple[object, ...]]) -> None:
-    """Applica le redirezioni dei descrittori nel processo figlio."""
-    for action in actions:
-        kind = action[0]
-        if kind == os.POSIX_SPAWN_DUP2:
-            _, source, target = action
-            if source != target:
-                os.dup2(source, target)
-        elif kind == os.POSIX_SPAWN_OPEN:
-            _, target, path, flags, mode = action
-            opened = os.open(path, flags, mode)
-            if opened != target:
-                os.dup2(opened, target)
-                os.close(opened)
-
-
 def spawn(
     argv: list[str],
     env: dict[str, str] | None = None,
@@ -161,24 +147,15 @@ def spawn(
     if executable not in EXECUTABILI_CONSENTITI:
         raise ValueError(f"eseguibile non consentito: {executable}")
 
-    actions = []
+    actions: list[tuple[int | str, ...]] = []
     for fd_no, target in ((1, stdout), (2, stderr)):
         if target is DEVNULL:
-            actions.append(
-                (os.POSIX_SPAWN_OPEN, fd_no, os.devnull, os.O_WRONLY, 0)
-            )
-        elif target is not None:
+            actions.append((os.POSIX_SPAWN_OPEN, fd_no, os.devnull, os.O_WRONLY, 0))
+        elif isinstance(target, int):
             actions.append((os.POSIX_SPAWN_DUP2, target, fd_no))
 
     child_env = dict(os.environ if env is None else env)
-    child_argv = list(argv)
-    pid = os.fork()
-    if pid == 0:
-        try:
-            _apply_actions(actions)
-            os.execve(executable, child_argv, child_env)
-        except BaseException:
-            os._exit(127)
+    pid = os.posix_spawn(executable, list(argv), child_env, file_actions=actions)
     return ChildProcess(pid)
 
 
