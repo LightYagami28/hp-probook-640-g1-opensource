@@ -48,6 +48,7 @@ jobs:
       - name: Unit tests with coverage
         run: |
           python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install pytest pytest-cov bandit pip-audit ruff mypy shellcheck-py
           .venv/bin/pytest --cov=subsystems/02-fingerprint-vfs495/scripts \
             --cov-report=xml:coverage.xml --cov-report=term-missing
