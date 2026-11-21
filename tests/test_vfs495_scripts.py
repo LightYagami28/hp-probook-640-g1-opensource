@@ -16,6 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "subsystems" / "02-fingerprint-vfs495" / "scripts"
+sys.path.insert(0, str(SCRIPTS))
 _LOADED = {}
 
 
@@ -232,19 +233,19 @@ def test_capture_main_paths(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         module.main()
 
-    def write_short(cmd, env=None, **kwargs):
+    def write_short(argv, env=None, **kwargs):
         Path(env["VFS_ASM_OUT"]).write_bytes(b"short")
-        return types.SimpleNamespace(returncode=0)
+        return 0
 
     monkeypatch.setattr(module.os.path, "exists", lambda path: True)
-    monkeypatch.setattr(module.subprocess, "run", write_short)
+    monkeypatch.setattr(module, "execute", write_short)
     assert module.main() == 10
 
-    def write_image(cmd, env=None, **kwargs):
+    def write_image(argv, env=None, **kwargs):
         Path(env["VFS_ASM_OUT"]).write_bytes(struct.pack("<II", 4, 2) + b"abcdefgh")
-        return types.SimpleNamespace(returncode=0)
+        return 0
 
-    monkeypatch.setattr(module.subprocess, "run", write_image)
+    monkeypatch.setattr(module, "execute", write_image)
     assert module.main() == 0
     written = (tmp_path / "out.pgm").read_bytes()
     assert written.startswith(b"P5\n4 2\n255\n")
@@ -338,32 +339,31 @@ def test_capture_directory_guard_and_command(tmp_path, monkeypatch):
     calls = []
     step = {"n": 0}
 
-    def fake_run(cmd, **kwargs):
-        calls.append(list(cmd))
-        if not str(cmd[-1]).endswith(".pgm"):
-            return types.SimpleNamespace(returncode=0)
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if not str(argv[-1]).endswith(".pgm"):
+            return 0
         step["n"] += 1
         if step["n"] == 1:
-            write_pgm(Path(cmd[-1]), 4, 90)
-            return types.SimpleNamespace(returncode=0)
+            write_pgm(Path(argv[-1]), 4, 90)
+            return 0
         if step["n"] == 2:
-            write_pgm(Path(cmd[-1]), 4, 2)
-            return types.SimpleNamespace(returncode=0)
-        return types.SimpleNamespace(returncode=1)
+            write_pgm(Path(argv[-1]), 4, 2)
+            return 0
+        return 1
 
-    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module, "execute", fake_run)
     saved = module.capture(3, str(root / "swipes"))
     assert len(saved) == 1
     command = next(cmd for cmd in calls if str(cmd[-1]).endswith(".pgm"))
     assert command[:2] == ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py"]
 
-    def only_tiny(cmd, **kwargs):
-        if str(cmd[-1]).endswith(".pgm"):
-            write_pgm(Path(cmd[-1]), 2, 1)
-            return types.SimpleNamespace(returncode=0)
-        return types.SimpleNamespace(returncode=0)
+    def only_tiny(argv, **kwargs):
+        if str(argv[-1]).endswith(".pgm"):
+            write_pgm(Path(argv[-1]), 2, 1)
+        return 0
 
-    monkeypatch.setattr(module.subprocess, "run", only_tiny)
+    monkeypatch.setattr(module, "execute", only_tiny)
     assert module.capture(1, str(root / "tiny")) == []
 
 
@@ -378,7 +378,7 @@ def test_install_template_uses_private_mode(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "enroll_from_images", lambda *args: MagicMock(serialize=lambda: b"tmpl"))
     monkeypatch.setattr(module, "verify", lambda *args: (True, 40))
     monkeypatch.setattr(module, "out", lambda message: None)
-    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module, "execute", lambda *args, **kwargs: 0)
     real_open = open
 
     def fake_open(path, mode="r", *args, **kwargs):
@@ -486,7 +486,7 @@ def test_bridge_run_and_kill_capture(monkeypatch):
     proc = MagicMock(pid=42)
     proc.__enter__.return_value = proc
     proc.wait.return_value = 0
-    monkeypatch.setattr(module.subprocess, "Popen", lambda *args, **kwargs: proc)
+    monkeypatch.setattr(module, "spawn", lambda *args, **kwargs: proc)
     assert module.run_capture("out.pgm") is True
     assert module.state["proc"] is None
     proc.wait.return_value = 1
@@ -494,17 +494,17 @@ def test_bridge_run_and_kill_capture(monkeypatch):
 
     killed = []
     pkills = []
-    monkeypatch.setattr(module.os, "killpg", lambda pid, sig: killed.append(pid), raising=False)
-    monkeypatch.setattr(module.subprocess, "run", lambda cmd, **kwargs: pkills.append(cmd))
+    monkeypatch.setattr(module, "terminate", lambda proc: killed.append(proc.pid))
+    monkeypatch.setattr(module, "execute", lambda argv, **kwargs: pkills.append(argv))
     proc.poll.return_value = None
     module.state["proc"] = proc
     module.kill_capture()
     assert killed == [42] and len(pkills) == 1
 
-    def refuse(pid, sig):
+    def refuse(proc):
         raise OSError("gone")
 
-    monkeypatch.setattr(module.os, "killpg", refuse, raising=False)
+    monkeypatch.setattr(module, "terminate", refuse)
     module.kill_capture()
     assert len(pkills) == 2
 
@@ -579,15 +579,15 @@ def test_capture_timeout_kills_sensor_helper(tmp_path, monkeypatch):
     monkeypatch.setattr(module.os.path, "exists", lambda path: True)
     calls = []
 
-    def timeout_then_kill(cmd, **kwargs):
-        calls.append(cmd[0])
-        if cmd[0] == "/usr/bin/gdb":
-            raise module.subprocess.TimeoutExpired(cmd, 1)
+    def timeout_then_kill(argv, **kwargs):
+        calls.append(argv[0])
+        if argv[0] == "/usr/bin/gdb":
+            raise module.CommandTimeout(argv, 1)
 
     def broken_unlink(path):
         raise OSError("busy")
 
-    monkeypatch.setattr(module.subprocess, "run", timeout_then_kill)
+    monkeypatch.setattr(module, "execute", timeout_then_kill)
     monkeypatch.setattr(module.os, "unlink", broken_unlink)
     assert module.main() == 10
     assert calls == ["/usr/bin/gdb", "/usr/bin/pkill"]

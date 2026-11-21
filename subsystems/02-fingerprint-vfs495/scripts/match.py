@@ -23,11 +23,12 @@ import re
 import socket
 import stat
 import struct
-import subprocess
 import sys
 import tempfile
 import threading
 from pathlib import Path
+
+from exec_command import execute
 
 THRESHOLD = 40
 MIN_ROWS = 80
@@ -230,11 +231,7 @@ def install_template(dev, files, imgs):
     path = write_template(user, bytes(print_.serialize()))
     out(f"enrolled right index finger for {user} from {len(files)} scan(s) -> {path}")
     check_template(dev, print_, files, imgs)
-    subprocess.run(
-        ["/usr/bin/systemctl", "restart", "fprintd"],
-        check=False,
-        stderr=subprocess.DEVNULL,
-    )
+    execute(["/usr/bin/systemctl", "restart", "fprintd"])
     out("\nnow test:  fprintd-verify   (wait ~2 s after the prompt, then swipe)")
 
 
@@ -273,14 +270,20 @@ STUCK_MESSAGE = (
 
 def capture_swipe(label, swipe):
     """Capture one swipe; return its height, or None if missed."""
+    path = Path(swipe).resolve()
+    if path.suffix != ".pgm" or not path.is_relative_to(CAPTURE_ROOT):
+        raise SystemExit(f"capture path must be a .pgm below {CAPTURE_ROOT}")
     out(f"{label} get ready... ")
     pause(1.0)
     out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")
-    cmd = ["/usr/bin/python3", "/usr/lib/vfs495-fprint/capture.py", os.fspath(swipe)]
-    result = subprocess.run(
-        cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    code = execute(
+        [
+            "/usr/bin/python3",
+            "/usr/lib/vfs495-fprint/capture.py",
+            os.fspath(path),
+        ]
     )
-    if result.returncode:
+    if code:
         out(f"{label} nothing captured (missed the swipe?)")
         return None
     width, height, _ = read_pgm(swipe)
@@ -304,11 +307,9 @@ def capture_directory(target):
 
 def set_bridge(action):
     """Start or stop the vfs495-bridge service."""
-    subprocess.run(
-        ["/usr/bin/systemctl", action, "vfs495-bridge"],
-        check=False,
-        stderr=subprocess.DEVNULL,
-    )
+    if action not in ("start", "stop", "restart"):
+        raise SystemExit(f"invalid bridge action: {action}")
+    execute(["/usr/bin/systemctl", action, "vfs495-bridge"])
 
 
 def warn_tiny(heights):

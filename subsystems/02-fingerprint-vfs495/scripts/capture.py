@@ -9,10 +9,11 @@ Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
 
 import os
 import struct
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from exec_command import CommandTimeout, execute
 
 HP = "/var/lib/vfs495-fprint"  # HP binary + shim libs (installed by setup-hp-driver.sh)
 LIB = "/usr/lib/vfs495-fprint"
@@ -31,23 +32,25 @@ def output_path(value):
 def run_driver(binp, asm):
     """Run the HP driver under gdb, killing the sensor helper when it times out."""
     env = {**os.environ, "LD_LIBRARY_PATH": HP + "/lib", "VFS_ASM_OUT": asm}
-    cmd = ["/usr/bin/gdb", "-q", "-batch", "-x", LIB + "/harvest_assembled.py"]
-    cmd += ["--args", binp, "getprintwait", "-doinit"]
+    timeout = int(os.environ.get("VFS_TIMEOUT", "75"))
     try:
-        subprocess.run(
-            cmd,
-            check=False,
+        execute(
+            [
+                "/usr/bin/gdb",
+                "-q",
+                "-batch",
+                "-x",
+                LIB + "/harvest_assembled.py",
+                "--args",
+                binp,
+                "getprintwait",
+                "-doinit",
+            ],
             env=env,
-            timeout=int(os.environ.get("VFS_TIMEOUT", "75")),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            timeout=timeout,
         )
-    except subprocess.TimeoutExpired:
-        subprocess.run(
-            ["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"],
-            check=False,
-            stderr=subprocess.DEVNULL,
-        )
+    except CommandTimeout:
+        execute(["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"])
 
 
 def take_harvest(asm):

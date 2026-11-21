@@ -10,13 +10,14 @@ than an authentication actually lasts.
 
 import importlib
 import os
-import signal
 import socket
 import struct
-import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
+
+from exec_command import execute, spawn, terminate
 
 dbus = importlib.import_module("dbus")
 importlib.import_module("dbus.mainloop.glib")
@@ -59,12 +60,9 @@ def deliver(width, height, data):
 
 def run_capture(out):
     """One capture attempt. Returns True if an image was written to `out`."""
-    with subprocess.Popen(
+    with spawn(
         ["/usr/bin/python3", CAPTURE, out],
         env={**os.environ, "VFS_TIMEOUT": "70"},
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
     ) as proc:
         with lock:
             state["proc"] = proc
@@ -80,14 +78,10 @@ def kill_capture():
         proc = state["proc"]
     if proc and proc.poll() is None:
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
+            terminate(proc)
         except OSError as error:
             log(f"cannot stop the capture process: {error}")
-        subprocess.run(
-            ["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"],
-            check=False,
-            stderr=subprocess.DEVNULL,
-        )
+        execute(["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"])
 
 
 def capture_is_current(gen):
@@ -135,7 +129,8 @@ def remove_file(path):
 def capture_and_deliver(gen):
     """Run up to two capture attempts for this generation."""
     os.makedirs(RUN, mode=0o700, exist_ok=True)
-    out, last = RUN + "/cap.pgm", RUN + "/last.pgm"
+    root = Path(RUN).resolve()
+    out, last = root / "cap.pgm", root / "last.pgm"
     try:
         for attempt in range(2):
             if deliver_capture(out, last, gen, time.monotonic()):
