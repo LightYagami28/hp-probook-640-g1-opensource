@@ -9,6 +9,7 @@ than an authentication actually lasts.
 """
 
 import importlib
+import logging
 import os
 import socket
 import struct
@@ -34,10 +35,18 @@ PROPS = "org.freedesktop.DBus.Properties"
 lock = threading.Lock()
 state = {"proc": None, "capturing": False, "wanted": False, "gen": 0}
 
+LOGGER = logging.getLogger("vfs495-bridge")
+if not LOGGER.handlers:
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("[vfs495-bridge] %(message)s"))
+    LOGGER.addHandler(handler)
+    LOGGER.setLevel(logging.INFO)
+    LOGGER.propagate = False
+
 
 def log(msg):
-    """Write a tagged line to stderr."""
-    print("[vfs495-bridge] " + msg, file=sys.stderr, flush=True)
+    """Emit a tagged message through the structured logger."""
+    LOGGER.info("%s", msg)
 
 
 def read_pgm(path):

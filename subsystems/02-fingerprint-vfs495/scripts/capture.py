@@ -7,6 +7,7 @@ motion-compensated assembled fingerprint is harvested. Output: PGM.
 Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
 """
 
+import logging
 import os
 import struct
 import sys
@@ -18,6 +19,14 @@ from exec_command import CommandTimeout, execute
 HP = "/var/lib/vfs495-fprint"  # HP binary + shim libs (installed by setup-hp-driver.sh)
 LIB = "/usr/lib/vfs495-fprint"
 OUTPUT_ROOT = Path("/run/vfs495-fprint")
+
+LOGGER = logging.getLogger("vfs495-capture")
+if not LOGGER.handlers:
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("[vfs495-capture] %(message)s"))
+    LOGGER.addHandler(handler)
+    LOGGER.setLevel(logging.INFO)
+    LOGGER.propagate = False
 
 
 def output_path(value):
@@ -62,7 +71,7 @@ def take_harvest(asm):
         try:
             os.unlink(asm)
         except OSError as error:
-            print(f"cannot remove {asm}: {error}", file=sys.stderr)
+            LOGGER.warning("cannot remove %s: %s", asm, error)
 
 
 def write_pgm(out, data):
@@ -87,10 +96,10 @@ def main():
     run_driver(binp, asm)
     data = take_harvest(asm)
     if len(data) < 16:
-        print("no finger captured", file=sys.stderr)
+        LOGGER.error("no finger captured")
         return 10
     width, height = write_pgm(out, data)
-    print(f"captured {width}x{height} -> {out}")
+    LOGGER.info("captured %dx%d -> %s", width, height, out)
     return 0
 
 
