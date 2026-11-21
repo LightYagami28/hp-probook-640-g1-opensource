@@ -20,7 +20,13 @@ Verifiche eseguite sul repository:
 
 ## Prossimi passi
 
-1. **Compilare il port su coreboot 26.09.** Oggi non è mai stato compilato: aspettarsi errori di API da correggere (vedi [docs/sviluppo.md](docs/sviluppo.md)).
+1. **Compilare il port su coreboot 26.09.** Oggi non è mai stato
+   compilato: aspettarsi errori di API da correggere.
+   Vedi [docs/sviluppo.md](docs/sviluppo.md).
 2. **Estrarre `data.vbt`** dalla macchina reale: non è inclusa nel repository (vedi [NOTICE.md](NOTICE.md)).
-3. **Flash in-circuit** con payload SeaBIOS e validazione dell'avvio Linux con la sola inizializzazione grafica nativa, seguendo [guida al flashing](security_and_flashing/FLASHING_GUIDE.md).
-4. **Neutralizzazione di Intel ME** nell'immagine finale, secondo l'analisi del descrittore in [analisi SPI](firmware_dump/DESCRIPTOR_ANALYSIS.md).
+3. **Flash in-circuit** con payload SeaBIOS e validazione
+   dell'avvio Linux con la sola inizializzazione grafica nativa,
+   seguendo [guida al flashing](security_and_flashing/FLASHING_GUIDE.md).
+4. **Neutralizzazione di Intel ME** nell'immagine finale, secondo
+   l'analisi del descrittore in
+   [analisi SPI](firmware_dump/DESCRIPTOR_ANALYSIS.md).
