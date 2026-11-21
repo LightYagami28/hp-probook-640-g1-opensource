@@ -1,6 +1,7 @@
 """Unit tests for the vfs495 script changes. No sensor or libfprint required."""
 import contextlib
 import importlib.util
+import inspect
 import io
 import os
 import runpy
@@ -746,3 +747,32 @@ def test_spawn_accepts_only_whitelisted_absolute_executables():
         module.spawn(["python3"])
     with pytest.raises(ValueError, match="non consentito"):
         module.spawn(["/bin/sh", "-c", "true"])
+
+
+def test_spawn_uses_posix_spawn_without_dynamic_exec(monkeypatch):
+    """Nessuna API di exec dinamico: avvio solo con posix_spawn e whitelist."""
+    module = load_script("exec_command.py", "vfs495_exec_command_spawn_api")
+    source = inspect.getsource(module.spawn)
+    assert "posix_spawn" in source
+    assert "execve" not in source and "execl" not in source and "execv" not in source
+    assert "fork" not in source
+
+    calls = {}
+
+    def fake_posix_spawn(path, argv, env, file_actions=None):
+        calls.update(path=path, argv=argv, env=env, file_actions=file_actions)
+        return 4242
+
+    monkeypatch.setattr(module.os, "posix_spawn", fake_posix_spawn, raising=False)
+    monkeypatch.setattr(module.os, "POSIX_SPAWN_OPEN", 1, raising=False)
+    monkeypatch.setattr(module.os, "POSIX_SPAWN_DUP2", 2, raising=False)
+    monkeypatch.setattr(module.os, "O_WRONLY", 1, raising=False)
+    proc = module.spawn(["/usr/bin/systemctl", "status", "vfs495"], env={"A": "B"})
+    assert proc.pid == 4242
+    assert calls["path"] == "/usr/bin/systemctl"
+    assert calls["argv"] == ["/usr/bin/systemctl", "status", "vfs495"]
+    assert calls["env"] == {"A": "B"}
+    assert calls["file_actions"] == [
+        (1, 1, module.os.devnull, 1, 0),
+        (1, 2, module.os.devnull, 1, 0),
+    ]
