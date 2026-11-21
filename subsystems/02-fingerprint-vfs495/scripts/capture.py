@@ -8,6 +8,7 @@ Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
 """
 
 import logging
+import logging.config
 import os
 import struct
 import sys
@@ -20,13 +21,28 @@ HP = "/var/lib/vfs495-fprint"  # HP binary + shim libs (installed by setup-hp-dr
 LIB = "/usr/lib/vfs495-fprint"
 OUTPUT_ROOT = Path("/run/vfs495-fprint")
 
+logging.config.dictConfig(
+    {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {"vfs": {"format": "[vfs495-capture] %(message)s"}},
+        "handlers": {
+            "stderr": {
+                "class": "logging.StreamHandler",
+                "formatter": "vfs",
+                "stream": "ext://sys.stderr",
+            }
+        },
+        "loggers": {
+            "vfs495-capture": {
+                "handlers": ["stderr"],
+                "level": "INFO",
+                "propagate": False,
+            }
+        },
+    }
+)
 LOGGER = logging.getLogger("vfs495-capture")
-if not LOGGER.handlers:
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter("[vfs495-capture] %(message)s"))
-    LOGGER.addHandler(handler)
-    LOGGER.setLevel(logging.INFO)
-    LOGGER.propagate = False
 
 
 def output_path(value):

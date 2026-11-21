@@ -46,6 +46,7 @@ class ChildProcess:
     _status: int | None = None
 
     def __enter__(self) -> Self:
+        """Restituisce il processo come context manager, pronto per l'attesa."""
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -131,6 +132,26 @@ def _terminate(pid: int) -> int:
     return status
 
 
+def _avvia(
+    executable: str,
+    argv: list[str],
+    child_env: dict[str, str],
+    actions: list[tuple[int | str, ...]],
+) -> int:
+    """Avvia uno degli eseguibili ammessi, con percorso letterale nel codice."""
+    if executable == "/usr/bin/python3":
+        return os.posix_spawn(
+            "/usr/bin/python3", argv, child_env, file_actions=actions
+        )
+    if executable == "/usr/bin/gdb":
+        return os.posix_spawn("/usr/bin/gdb", argv, child_env, file_actions=actions)
+    if executable == "/usr/bin/pkill":
+        return os.posix_spawn("/usr/bin/pkill", argv, child_env, file_actions=actions)
+    if executable == "/usr/bin/systemctl":
+        return os.posix_spawn("/usr/bin/systemctl", argv, child_env, file_actions=actions)
+    raise ValueError(f"eseguibile non consentito: {executable}")
+
+
 def spawn(
     argv: list[str],
     env: dict[str, str] | None = None,
@@ -154,7 +175,7 @@ def spawn(
             actions.append((os.POSIX_SPAWN_DUP2, target, fd_no))
 
     child_env = dict(os.environ if env is None else env)
-    pid = os.posix_spawn(executable, list(argv), child_env, file_actions=actions)
+    pid = _avvia(executable, list(argv), child_env, actions)
     return ChildProcess(pid)
 
 
