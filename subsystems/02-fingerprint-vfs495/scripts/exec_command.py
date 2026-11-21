@@ -12,8 +12,20 @@ import os
 import signal
 import time
 from dataclasses import dataclass
+from typing import Final
 
 DEVNULL = object()
+
+# Unico punto di avvio processi: solo questi eseguibili assoluti sono ammessi.
+# La lista non deriva da input dell'utente ne' da variabili d'ambiente.
+EXECUTABILI_CONSENTITI: Final[frozenset[str]] = frozenset(
+    {
+        "/usr/bin/python3",
+        "/usr/bin/gdb",
+        "/usr/bin/pkill",
+        "/usr/bin/systemctl",
+    }
+)
 
 
 class CommandTimeout(Exception):
@@ -129,6 +141,8 @@ def spawn(
         raise ValueError("lista di argomenti vuota")
     if not argv[0].startswith("/"):
         raise ValueError("l'eseguibile deve essere un percorso assoluto")
+    if argv[0] not in EXECUTABILI_CONSENTITI:
+        raise ValueError(f"eseguibile non consentito: {argv[0]}")
 
     actions = []
     for fd_no, target in ((1, stdout), (2, stderr)):

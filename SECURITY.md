@@ -21,3 +21,27 @@ di GitHub ("Security" > "Report a vulnerability") sul repository.
 
 Vedi [`docs/sicurezza.md`](docs/sicurezza.md) e
 [`security_and_flashing/FLASHING_GUIDE.md`](security_and_flashing/FLASHING_GUIDE.md).
+
+## Avvio processi
+
+Tutti gli script avviano processi da un unico punto, in
+`exec_command.py::spawn`: `posix_spawn` senza shell, con
+argomenti separati e lista di quattro eseguibili assoluti
+ammessi (`python3`, `gdb`, `pkill`, `systemctl`). Qualunque
+altro percorso viene rifiutato prima della chiamata.
+
+## Stato analisi statica (2026-11-21)
+
+Prima degli interventi: 19 finding (1 Error, 2 Warning,
+16 Info). Nessuna soppressione aggiunta.
+
+- `dangerous-spawn-process-audit` (1 Error): il primo
+  argomento di `posix_spawn` e' una variabile perche' la
+  scelta tra i quattro eseguibili e' dinamica; e'
+  comunque limitata alla whitelist soprastante.
+- `Prospector_pydocstyle` (8), `Lizard_nloc-minor` (4),
+  `Lizard_ccn-minor` (2): stile e soglie di complessita'
+  sotto il limite critico.
+- `sleep.arbitrary-sleep` (1): polling deliberato di 20 ms
+  nell'attesa del figlio, con timeout massimo.
+- `Prospector_vulture` (1): funzione `_close` non usata.

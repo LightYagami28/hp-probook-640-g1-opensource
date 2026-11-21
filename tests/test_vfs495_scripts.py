@@ -732,3 +732,17 @@ def test_match_script_entry_point_prints_usage_and_cleans_up(monkeypatch, capfd)
         runpy.run_path(str(SCRIPTS / "match.py"), run_name="__main__")
     assert exit_info.value.code == 0
     assert "vfs495-match IMG1.pgm" in capfd.readouterr().out
+
+
+def test_spawn_accepts_only_whitelisted_absolute_executables():
+    module = load_script("exec_command.py", "vfs495_exec_command_whitelist")
+    assert module.EXECUTABILI_CONSENTITI == {
+        "/usr/bin/python3",
+        "/usr/bin/gdb",
+        "/usr/bin/pkill",
+        "/usr/bin/systemctl",
+    }
+    with pytest.raises(ValueError, match="percorso assoluto"):
+        module.spawn(["python3"])
+    with pytest.raises(ValueError, match="non consentito"):
+        module.spawn(["/bin/sh", "-c", "true"])
