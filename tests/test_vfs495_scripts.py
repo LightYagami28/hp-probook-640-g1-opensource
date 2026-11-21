@@ -6,8 +6,8 @@ import os
 import runpy
 import struct
 import sys
-import time
 import tempfile
+import time
 import types
 from pathlib import Path
 from unittest.mock import MagicMock
