@@ -414,7 +414,8 @@ def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "find_templates", lambda: [str(tmpl)])
     assert module.main(["m", "--capture", "1"]) == 0
     monkeypatch.setattr(module, "capture", lambda n, d: [])
-    assert module.main(["m", "--capture", "1"]) == 1
+    with pytest.raises(SystemExit):
+        module.main(["m", "--capture", "1"])
 
     module.FPrint.Print.deserialize.side_effect = module.GLib.Error("bad")
     module.GLib.Error.message = "bad"
@@ -425,7 +426,7 @@ def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
     assert module.read_input(tmpl) == b"x"
 
 
-def test_main_returns_distinct_exit_codes(tmp_path, monkeypatch):
+def test_main_single_return_path_and_fast_failure(tmp_path, monkeypatch):
     module = match()
     img = tmp_path / "a.pgm"
     write_pgm(img, 2, 80)
@@ -435,19 +436,18 @@ def test_main_returns_distinct_exit_codes(tmp_path, monkeypatch):
     device.get_driver.return_value = "virtual_image"
     monkeypatch.setattr(module, "open_device", lambda: (None, device))
     monkeypatch.setattr(module, "out", lambda message: None)
-    messages = []
-    monkeypatch.setattr(module, "err", messages.append)
+    monkeypatch.setattr(module, "err", lambda message: None)
     monkeypatch.setattr(module, "CONN", [])
 
     assert module.main(["vfs495-match", "--help"]) == 0
     assert module.main(["vfs495-match", str(img)]) == 0
 
-    # A user-facing failure reports the same message on stderr and returns a
-    # failure status instead of escaping as SystemExit.
-    assert module.main(["vfs495-match", str(bad)]) == 1
-    assert any("not a binary PGM" in message for message in messages)
-    assert module.main(["vfs495-match", "--enroll"]) == 1
-    assert any("no images given" in message for message in messages)
+    # Failures still stop the application with the original message (S5754):
+    # there is no swallowing branch that would turn an error into a return value.
+    with pytest.raises(SystemExit, match="not a binary PGM"):
+        module.main(["vfs495-match", str(bad)])
+    with pytest.raises(SystemExit, match="no images given"):
+        module.main(["vfs495-match", "--enroll"])
     device.close_sync.assert_called()
 
 
