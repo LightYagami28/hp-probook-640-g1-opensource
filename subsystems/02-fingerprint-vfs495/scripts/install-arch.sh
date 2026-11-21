@@ -1,6 +1,10 @@
 #!/bin/bash
 # Complete automated installer for Arch Linux (Validity VFS495 138a:003f)
-set -euo pipefail
+# -E propagates the ERR trap into functions, command substitutions and subshells.
+set -Eeuo pipefail
+
+trap 'echo "ERROR: failed at line $LINENO ($BASH_COMMAND)" >&2' ERR
+trap 'echo "Installer finished with status $?" >&2' EXIT
 
 echo "=== Installing VFS495 Fingerprint Subsystem for Arch Linux ==="
 
