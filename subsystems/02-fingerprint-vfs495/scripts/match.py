@@ -445,22 +445,30 @@ def run_scoring(dev, files, imgs, templates):
 
 
 def main(argv):
-    """Entry point."""
+    """Entry point: return 0 on success, 1 on a user-facing failure."""
     args = argv[1:]
     if not args or args[0] in ("-h", "--help"):
         out(__doc__)
         return 0
-    files, template_file, enroll, captured = parse_args(args)
-    imgs = load_images(files)
-    _, dev = open_device()
-    out(
-        f"matcher: libfprint {dev.get_driver()} (NBIS bozorth3), threshold {THRESHOLD}\n"
-    )
-    if enroll:
-        install_template(dev, files, imgs)
-    else:
-        run_scoring(dev, files, imgs, collect_templates(template_file, captured))
-    finish(dev)
+    try:
+        files, template_file, enroll, captured = parse_args(args)
+        imgs = load_images(files)
+        _, dev = open_device()
+        out(
+            f"matcher: libfprint {dev.get_driver()} (NBIS bozorth3), threshold {THRESHOLD}\n"
+        )
+        if enroll:
+            install_template(dev, files, imgs)
+        else:
+            run_scoring(dev, files, imgs, collect_templates(template_file, captured))
+        finish(dev)
+    except SystemExit as error:
+        # Failures used to escape as SystemExit(message): the interpreter printed the
+        # message and exited with status 1. Keep that output and status, but return the
+        # failure code from this entry point so success and failure are distinct.
+        if error.code:
+            err(str(error.code))
+        return 1
     return 0
 
 

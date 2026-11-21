@@ -414,8 +414,7 @@ def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "find_templates", lambda: [str(tmpl)])
     assert module.main(["m", "--capture", "1"]) == 0
     monkeypatch.setattr(module, "capture", lambda n, d: [])
-    with pytest.raises(SystemExit):
-        module.main(["m", "--capture", "1"])
+    assert module.main(["m", "--capture", "1"]) == 1
 
     module.FPrint.Print.deserialize.side_effect = module.GLib.Error("bad")
     module.GLib.Error.message = "bad"
@@ -424,6 +423,32 @@ def test_main_template_capture_and_input_guard(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         module.input_path(tmp_path)
     assert module.read_input(tmpl) == b"x"
+
+
+def test_main_returns_distinct_exit_codes(tmp_path, monkeypatch):
+    module = match()
+    img = tmp_path / "a.pgm"
+    write_pgm(img, 2, 80)
+    bad = tmp_path / "bad.txt"
+    bad.write_text("not a pgm")
+    device = MagicMock()
+    device.get_driver.return_value = "virtual_image"
+    monkeypatch.setattr(module, "open_device", lambda: (None, device))
+    monkeypatch.setattr(module, "out", lambda message: None)
+    messages = []
+    monkeypatch.setattr(module, "err", messages.append)
+    monkeypatch.setattr(module, "CONN", [])
+
+    assert module.main(["vfs495-match", "--help"]) == 0
+    assert module.main(["vfs495-match", str(img)]) == 0
+
+    # A user-facing failure reports the same message on stderr and returns a
+    # failure status instead of escaping as SystemExit.
+    assert module.main(["vfs495-match", str(bad)]) == 1
+    assert any("not a binary PGM" in message for message in messages)
+    assert module.main(["vfs495-match", "--enroll"]) == 1
+    assert any("no images given" in message for message in messages)
+    device.close_sync.assert_called()
 
 
 def test_main_enroll_installs_template(tmp_path, monkeypatch):
