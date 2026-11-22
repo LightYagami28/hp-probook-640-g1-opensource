@@ -15,9 +15,8 @@ import threading
 import time
 from pathlib import Path
 
-from logging_setup import configure_logger
-
 from exec_command import execute, spawn, terminate
+from logging_setup import configure_logger
 
 dbus = importlib.import_module("dbus")
 importlib.import_module("dbus.mainloop.glib")

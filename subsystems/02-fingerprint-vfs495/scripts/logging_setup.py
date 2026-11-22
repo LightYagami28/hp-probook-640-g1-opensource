@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Configurazione condivisa del logging degli script vfs495."""
 
 import logging
