@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""Event-driven bridge between the vfs495 sensor and fprintd.
+"""Event-driven bridge between the vfs495 sensor and fprintd."""
 
-It stays completely idle until fprintd's device reports finger-needed=true (a verify or
-enroll is waiting for a swipe), then runs ONE capture on the real sensor and delivers the
-image to libfprint's virtual_image socket. When fprintd stops needing a finger (timeout,
-cancel, done) a still-running capture is cancelled, so the sensor is never held longer
-than an authentication actually lasts.
-"""
+# It stays completely idle until fprintd's device reports finger-needed=true (a verify or
+# enroll is waiting for a swipe), then runs ONE capture on the real sensor and delivers the
+# image to libfprint's virtual_image socket. When fprintd stops needing a finger (timeout,
+# cancel, done) a still-running capture is cancelled, so the sensor is never held longer
+# than an authentication actually lasts.
 
 import importlib
-import logging
-import logging.config
 import os
 import socket
 import struct
@@ -19,6 +16,7 @@ import time
 from pathlib import Path
 
 from exec_command import execute, spawn, terminate
+from logging_setup import configure_logger
 
 dbus = importlib.import_module("dbus")
 importlib.import_module("dbus.mainloop.glib")
@@ -35,28 +33,7 @@ PROPS = "org.freedesktop.DBus.Properties"
 lock = threading.Lock()
 state = {"proc": None, "capturing": False, "wanted": False, "gen": 0}
 
-logging.config.dictConfig(
-    {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {"vfs": {"format": "[vfs495-bridge] %(message)s"}},
-        "handlers": {
-            "stderr": {
-                "class": "logging.StreamHandler",
-                "formatter": "vfs",
-                "stream": "ext://sys.stderr",
-            }
-        },
-        "loggers": {
-            "vfs495-bridge": {
-                "handlers": ["stderr"],
-                "level": "INFO",
-                "propagate": False,
-            }
-        },
-    }
-)
-LOGGER = logging.getLogger("vfs495-bridge")
+LOGGER = configure_logger("vfs495-bridge")
 
 
 def log(msg):

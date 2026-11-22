@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""
-Offline fingerprint match scoring with the libfprint matcher that fprintd uses.
+"""Offline fingerprint match scoring with the libfprint matcher that fprintd uses."""
 
-  vfs495-match IMG1.pgm IMG2.pgm [IMG3.pgm ...]   score every image against every other
-  vfs495-match --template FILE IMG.pgm [...]       score images against an fprintd template
-                                                    (e.g. /var/lib/fprint/<user>/virtual_image/0/7)
-  sudo vfs495-match --capture N [DIR]             capture N swipes from the sensor into DIR
-                                                    (default /run/vfs495-fprint/test), then score them
-                                                    against each other and against your enrolled finger
-  sudo vfs495-match --enroll IMG.pgm [...]        enroll the given scans (e.g. the ones --capture just
-                                                    took) as your right index finger in fprintd
+USAGE = """vfs495-match IMG1.pgm IMG2.pgm [IMG3.pgm ...]   score every image against every other
+vfs495-match --template FILE IMG.pgm [...]       score images against an fprintd template
+                                                  (e.g. /var/lib/fprint/<user>/virtual_image/0/7)
+sudo vfs495-match --capture N [DIR]             capture N swipes from the sensor into DIR
+                                                  (default /run/vfs495-fprint/test), then score them
+                                                  against each other and against your enrolled finger
+sudo vfs495-match --enroll IMG.pgm [...]        enroll the given scans (e.g. the ones --capture just
+                                                  took) as your right index finger in fprintd
 
 Scores are libfprint/NBIS bozorth3 scores. fprintd accepts a swipe when the score against any
 enrolled sub-template is >= 40. Genuine swipes of the same finger typically score 40-150,
-different fingers < 15. No sensor is touched unless --capture is used.
-"""
+different fingers < 15. No sensor is touched unless --capture is used."""
 
 import glob
 import importlib
@@ -111,11 +109,9 @@ def pause(seconds):
 
 
 def send_image(img, delay=0.3):
-    """Feed one image to the in-process virtual_image device.
-
-    The image is sent from a helper thread over one persistent connection, so the driver
-    never sees a hang-up mid-operation.
-    """
+    """Feed one image to the in-process virtual_image device."""
+    # The image is sent from a helper thread over one persistent connection, so the driver
+    # never sees a hang-up mid-operation.
     width, height, data = img
 
     def run():
@@ -449,7 +445,7 @@ def main(argv):
     """Entry point: return 0 on success; failures fail fast via SystemExit."""
     args = argv[1:]
     if not args or args[0] in ("-h", "--help"):
-        out(__doc__)
+        out(USAGE)
     else:
         files, template_file, enroll, captured = parse_args(args)
         imgs = load_images(files)

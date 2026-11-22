@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Capture one fingerprint swipe through HP's validity-sensor driver.
+"""Capture one fingerprint swipe through HP's validity-sensor driver."""
 
-The driver holds the sensor's secure session, so it is driven under gdb and its
-motion-compensated assembled fingerprint is harvested. Output: PGM.
+# The driver holds the sensor's secure session, so it is driven under gdb and its
+# motion-compensated assembled fingerprint is harvested. Output: PGM.
+#
+# Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
 
-Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
-"""
-
-import logging
-import logging.config
 import os
 import struct
 import sys
@@ -16,33 +13,13 @@ import tempfile
 from pathlib import Path
 
 from exec_command import CommandTimeout, execute
+from logging_setup import configure_logger
 
 HP = "/var/lib/vfs495-fprint"  # HP binary + shim libs (installed by setup-hp-driver.sh)
 LIB = "/usr/lib/vfs495-fprint"
 OUTPUT_ROOT = Path("/run/vfs495-fprint")
 
-logging.config.dictConfig(
-    {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {"vfs": {"format": "[vfs495-capture] %(message)s"}},
-        "handlers": {
-            "stderr": {
-                "class": "logging.StreamHandler",
-                "formatter": "vfs",
-                "stream": "ext://sys.stderr",
-            }
-        },
-        "loggers": {
-            "vfs495-capture": {
-                "handlers": ["stderr"],
-                "level": "INFO",
-                "propagate": False,
-            }
-        },
-    }
-)
-LOGGER = logging.getLogger("vfs495-capture")
+LOGGER = configure_logger("vfs495-capture")
 
 
 def output_path(value):
