@@ -1,4 +1,4 @@
-"""Esecuzione di comandi fissi senza shell per gli script vfs495."""
+"""Esecuzione di comandi fissi senza shell e senza PATH per gli script vfs495."""
 
 # Ogni chiamante passa un eseguibile assoluto e una lista di argomenti separati;
 # i valori dinamici (percorso dello swipe o azione di systemctl) vengono convalidati
@@ -17,7 +17,7 @@ from typing import Final, Self
 DEVNULL = object()
 
 # Unico punto di avvio processi: solo questi eseguibili assoluti sono ammessi.
-# La lista non deriva da input dell'utente ne' da variabili d'ambiente.
+# La lista non deriva da input dell'utente né da variabili d'ambiente.
 EXECUTABILI_CONSENTITI: Final[frozenset[str]] = frozenset(
     {
         "/usr/bin/python3",
@@ -55,7 +55,7 @@ class ChildProcess:
             self.wait()
 
     def poll(self) -> int | None:
-        """Restituisce il codice di uscita se il processo e' terminato."""
+        """Restituisce il codice di uscita se il processo è terminato."""
         if self._status is None:
             done, status = os.waitpid(self.pid, os.WNOHANG)
             if done:
@@ -77,7 +77,7 @@ class ChildProcess:
 
 
 def _signal(pid: int, sig: int) -> bool:
-    """Invia un segnale; restituisce False se il processo e' gia' uscito."""
+    """Invia un segnale; restituisce False se il processo è già uscito."""
     try:
         os.kill(pid, sig)
     except ProcessLookupError:
