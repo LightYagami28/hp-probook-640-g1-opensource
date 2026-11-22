@@ -1,11 +1,10 @@
-"""Esecuzione di comandi fissi senza shell per gli script vfs495.
+"""Esecuzione di comandi fissi senza shell per gli script vfs495."""
 
-Ogni chiamante passa un eseguibile assoluto e una lista di argomenti separati;
-i valori dinamici (percorso dello swipe o azione di systemctl) vengono convalidati
-prima di costruire la lista. Al posto di ``fork`` + ``execve`` si usa
-``posix_spawn`` con file_actions: nessuna stringa viene interpretata da una shell,
-i nomi non sono risolti via PATH e nel figlio non corre codice Python.
-"""
+# Ogni chiamante passa un eseguibile assoluto e una lista di argomenti separati;
+# i valori dinamici (percorso dello swipe o azione di systemctl) vengono convalidati
+# prima di costruire la lista. Al posto di ``fork`` + ``execve`` si usa
+# ``posix_spawn`` con file_actions: nessuna stringa viene interpretata da una shell,
+# i nomi non sono risolti via PATH e nel figlio non corre codice Python.
 
 from __future__ import annotations
 
@@ -33,6 +32,7 @@ class CommandTimeout(Exception):
     """Un comando ha superato il tempo massimo previsto."""
 
     def __init__(self, argv: list[str], seconds: float) -> None:
+        """Registra gli argomenti e il tempo massimo del comando interrotto."""
         self.argv = tuple(argv)
         self.seconds = seconds
         super().__init__(f"comando interrotto dopo {seconds}s: {argv[0]}")
@@ -50,6 +50,7 @@ class ChildProcess:
         return self
 
     def __exit__(self, *_exc: object) -> None:
+        """Attende il processo alla chiusura del context manager."""
         if self._status is None:
             self.wait()
 
@@ -73,17 +74,6 @@ class ChildProcess:
         """Termina il processo e i figli, conservandone lo stato di uscita."""
         if self._status is None:
             self._status = _terminate(self.pid)
-
-
-def _close(fd: int | None) -> bool:
-    """Chiude un descrittore; restituisce False se era gia' chiuso."""
-    if fd is None:
-        return False
-    try:
-        os.close(fd)
-    except OSError:
-        return False
-    return True
 
 
 def _signal(pid: int, sig: int) -> bool:
@@ -148,11 +138,11 @@ def spawn(
         raise ValueError(f"eseguibile non consentito: {executable}")
 
     actions: list[tuple[int | str, ...]] = []
-    for fd_no, target in ((1, stdout), (2, stderr)):
+    for descriptor, target in ((1, stdout), (2, stderr)):
         if target is DEVNULL:
-            actions.append((os.POSIX_SPAWN_OPEN, fd_no, os.devnull, os.O_WRONLY, 0))
+            actions.append((os.POSIX_SPAWN_OPEN, descriptor, os.devnull, os.O_WRONLY, 0))
         elif isinstance(target, int):
-            actions.append((os.POSIX_SPAWN_DUP2, target, fd_no))
+            actions.append((os.POSIX_SPAWN_DUP2, target, descriptor))
 
     child_env = dict(os.environ if env is None else env)
     pid = os.posix_spawn(executable, list(argv), child_env, file_actions=actions)

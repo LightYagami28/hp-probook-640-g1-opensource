@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Capture one fingerprint swipe through HP's validity-sensor driver.
+"""Capture one fingerprint swipe through HP's validity-sensor driver."""
 
-The driver holds the sensor's secure session, so it is driven under gdb and its
-motion-compensated assembled fingerprint is harvested. Output: PGM.
-
-Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
-"""
+# The driver holds the sensor's secure session, so it is driven under gdb and its
+# motion-compensated assembled fingerprint is harvested. Output: PGM.
+#
+# Usage: vfs495-capture OUT.pgm     (root)     env: VFS_TIMEOUT (s, default 75)
 
 import logging
 import logging.config
