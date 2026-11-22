@@ -8,14 +8,14 @@
 # than an authentication actually lasts.
 
 import importlib
-import logging
-import logging.config
 import os
 import socket
 import struct
 import threading
 import time
 from pathlib import Path
+
+from logging_setup import configure_logger
 
 from exec_command import execute, spawn, terminate
 
@@ -34,28 +34,7 @@ PROPS = "org.freedesktop.DBus.Properties"
 lock = threading.Lock()
 state = {"proc": None, "capturing": False, "wanted": False, "gen": 0}
 
-logging.config.dictConfig(
-    {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {"vfs": {"format": "[vfs495-bridge] %(message)s"}},
-        "handlers": {
-            "stderr": {
-                "class": "logging.StreamHandler",
-                "formatter": "vfs",
-                "stream": "ext://sys.stderr",
-            }
-        },
-        "loggers": {
-            "vfs495-bridge": {
-                "handlers": ["stderr"],
-                "level": "INFO",
-                "propagate": False,
-            }
-        },
-    }
-)
-LOGGER = logging.getLogger("vfs495-bridge")
+LOGGER = configure_logger("vfs495-bridge")
 
 
 def log(msg):
