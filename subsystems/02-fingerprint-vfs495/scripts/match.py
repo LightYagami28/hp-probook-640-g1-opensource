@@ -264,11 +264,17 @@ STUCK_MESSAGE = (
 )
 
 
-def capture_swipe(label, swipe):
-    """Capture one swipe; return its height, or None if missed."""
+def _capture_path(swipe):
+    """Convalida il percorso di una cattura e lo restituisce risolto."""
     path = Path(swipe).resolve()
     if path.suffix != ".pgm" or not path.is_relative_to(CAPTURE_ROOT):
         raise SystemExit(f"capture path must be a .pgm below {CAPTURE_ROOT}")
+    return path
+
+
+def capture_swipe(label, swipe):
+    """Capture one swipe; return its height, or None if missed."""
+    path = _capture_path(swipe)
     out(f"{label} get ready... ")
     pause(1.0)
     out(f"{label} SWIPE NOW (slowly, whole fingertip, one steady motion)")

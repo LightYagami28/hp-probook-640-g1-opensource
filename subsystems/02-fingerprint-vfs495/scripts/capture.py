@@ -31,26 +31,27 @@ def output_path(value):
     return path
 
 
+def _driver_argv(binp):
+    """Restituisce gli argomenti per eseguire il driver HP sotto gdb."""
+    return [
+        "/usr/bin/gdb",
+        "-q",
+        "-batch",
+        "-x",
+        LIB + "/harvest_assembled.py",
+        "--args",
+        binp,
+        "getprintwait",
+        "-doinit",
+    ]
+
+
 def run_driver(binp, asm):
     """Run the HP driver under gdb, killing the sensor helper when it times out."""
     env = {**os.environ, "LD_LIBRARY_PATH": HP + "/lib", "VFS_ASM_OUT": asm}
     timeout = int(os.environ.get("VFS_TIMEOUT", "75"))
     try:
-        execute(
-            [
-                "/usr/bin/gdb",
-                "-q",
-                "-batch",
-                "-x",
-                LIB + "/harvest_assembled.py",
-                "--args",
-                binp,
-                "getprintwait",
-                "-doinit",
-            ],
-            env=env,
-            timeout=timeout,
-        )
+        execute(_driver_argv(binp), env=env, timeout=timeout)
     except CommandTimeout:
         execute(["/usr/bin/pkill", "-9", "-f", "validity-sensor-unlocked"])
 
