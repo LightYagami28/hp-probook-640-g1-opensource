@@ -19,3 +19,6 @@ __pycache__/
 !.env.example
 *.pem
 *.key
+
+# Cache locale di sonar-scanner
+.scannerwork/
