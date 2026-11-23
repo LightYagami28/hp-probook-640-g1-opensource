@@ -180,10 +180,8 @@ def on_verify_selected(*_args, **_kwargs):
     on_needed("verify started")
 
 
-def main():
-    """Subscribe to the fprintd signals and run the GLib main loop."""
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-    bus = dbus.SystemBus()
+def _register_signals(bus):
+    """Registra i ricevitori dei segnali fprintd sul bus di sistema."""
     bus.add_signal_receiver(
         on_props_changed,
         signal_name="PropertiesChanged",
@@ -198,6 +196,13 @@ def main():
         bus_name=BUS_NAME,
         path_keyword="path",
     )
+
+
+def main():
+    """Subscribe to the fprintd signals and run the GLib main loop."""
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SystemBus()
+    _register_signals(bus)
 
     def check_initial():  # a scan already pending at startup?
         try:

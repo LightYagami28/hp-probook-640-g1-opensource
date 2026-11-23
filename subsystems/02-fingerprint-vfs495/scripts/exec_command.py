@@ -100,15 +100,18 @@ def _wait(pid: int, timeout: float | None) -> int:
         time.sleep(0.02)
 
 
-def _terminate(pid: int) -> int:
-    """Termina il processo e i suoi figli diretti, poi restituisce lo stato."""
-    children = []
+def _children(pid: int) -> list[int]:
+    """Restituisce i figli diretti di ``pid`` leggendoli da /proc."""
     try:
         with open(f"/proc/{pid}/task/{pid}/children", encoding="ascii") as handle:
-            children = [int(value) for value in handle.read().split() if value.isdigit()]
+            return [int(value) for value in handle.read().split() if value.isdigit()]
     except (OSError, ValueError):
-        children = []
-    for child in children:
+        return []
+
+
+def _terminate(pid: int) -> int:
+    """Termina il processo e i suoi figli diretti, poi restituisce lo stato."""
+    for child in _children(pid):
         _signal(child, signal.SIGTERM)
     _signal(pid, signal.SIGTERM)
     deadline = time.monotonic() + 2
@@ -122,6 +125,29 @@ def _terminate(pid: int) -> int:
     return status
 
 
+def _validate_executable(argv: list[str]) -> str:
+    """Convalida ``argv`` e restituisce l'eseguibile assoluto consentito."""
+    if not argv:
+        raise ValueError("lista di argomenti vuota")
+    executable = argv[0]
+    if not executable.startswith("/"):
+        raise ValueError("l'eseguibile deve essere un percorso assoluto")
+    if executable not in EXECUTABILI_CONSENTITI:
+        raise ValueError(f"eseguibile non consentito: {executable}")
+    return executable
+
+
+def _spawn_actions(stdout: object, stderr: object) -> list[tuple[int | str, ...]]:
+    """Costruisce le redirezioni dei descrittori per ``posix_spawn``."""
+    actions: list[tuple[int | str, ...]] = []
+    for descriptor, target in ((1, stdout), (2, stderr)):
+        if target is DEVNULL:
+            actions.append((os.POSIX_SPAWN_OPEN, descriptor, os.devnull, os.O_WRONLY, 0))
+        elif isinstance(target, int):
+            actions.append((os.POSIX_SPAWN_DUP2, target, descriptor))
+    return actions
+
+
 def spawn(
     argv: list[str],
     env: dict[str, str] | None = None,
@@ -129,21 +155,8 @@ def spawn(
     stderr: object = DEVNULL,
 ) -> ChildProcess:
     """Avvia ``argv`` senza shell e restituisce un handle sul processo."""
-    if not argv:
-        raise ValueError("lista di argomenti vuota")
-    if not argv[0].startswith("/"):
-        raise ValueError("l'eseguibile deve essere un percorso assoluto")
-    executable = argv[0]
-    if executable not in EXECUTABILI_CONSENTITI:
-        raise ValueError(f"eseguibile non consentito: {executable}")
-
-    actions: list[tuple[int | str, ...]] = []
-    for descriptor, target in ((1, stdout), (2, stderr)):
-        if target is DEVNULL:
-            actions.append((os.POSIX_SPAWN_OPEN, descriptor, os.devnull, os.O_WRONLY, 0))
-        elif isinstance(target, int):
-            actions.append((os.POSIX_SPAWN_DUP2, target, descriptor))
-
+    executable = _validate_executable(argv)
+    actions = _spawn_actions(stdout, stderr)
     child_env = dict(os.environ if env is None else env)
     pid = os.posix_spawn(executable, list(argv), child_env, file_actions=actions)
     return ChildProcess(pid)
