@@ -14,7 +14,7 @@ Verifiche eseguite sul repository:
 - `python3 -m pytest -q`: 22 test superati, 0 errori, 0 warning.
 - `ruff check .`: tutti i controlli superati, 0 errori (ordinamento degli
 import corretto).
-- `npx --yes markdownlint-cli2 "**/*.md"`: 47 file, 0 problemi.
+- `make lint-md`: 47 file, 0 problemi.
 
 ## Obiettivi
 

@@ -7,6 +7,7 @@ dump*.bin
 
 # Test e ambienti locali
 .venv/
+.ci-tools/node_modules/
 .pytest_cache/
 .coverage
 coverage.xml

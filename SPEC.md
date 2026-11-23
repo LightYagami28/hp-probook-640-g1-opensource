@@ -34,7 +34,7 @@ Versioni e fonti:
 | flashrom | 1.8.0 (verificata il 2026-10-31, da riconfermare) | download.flashrom.org |
 | ifdtool | quello di `util/ifdtool` nell'albero coreboot 26.09 | coreboot |
 | actions/checkout | v7.0.1 (SHA) | `.github/workflows/ci.yml` |
-| markdownlint-cli2-action | v25.0.0 (SHA) | `ci.yml` |
+| markdownlint-cli2 0.24.2 con katex 0.19.1 | override in `.ci-tools` | `ci.yml` |
 | lychee-action | v2.9.0 (SHA) | `ci.yml` |
 | gitleaks-action | v3.0.0 (SHA) | `ci.yml` |
 | sonarqube-scan-action | v8.4.1 (SHA) | `ci.yml` |
@@ -113,8 +113,8 @@ GPE `0x16`), HDA (IDT 92HD91BXX), DDI/eDP (libgfxinit).
    coverage 100%.
 7. I file proprietari non sono nel repository. Accettazione: `data.vbt`, i dump
    `.bin` e le regioni estratte non compaiono in `git ls-files`; gitleaks passa.
-8. Documentazione senza errori. Accettazione: `npx markdownlint-cli2
-   "**/*.md"` e lychee passano senza avvisi.
+8. Documentazione senza errori. Accettazione: `make lint-md` e lychee
+   passano senza avvisi.
 
 ## Requisiti non funzionali
 
@@ -161,7 +161,7 @@ GPE `0x16`), HDA (IDT 92HD91BXX), DDI/eDP (libgfxinit).
 ## Come verificare
 
 ```bash
-npx markdownlint-cli2 "**/*.md"
+make lint-md
 python -m venv .venv
 .venv/bin/pip install pytest pytest-cov    # su Windows: .venv\Scripts\pip
 .venv/bin/pytest --cov=subsystems/02-fingerprint-vfs495/scripts \

@@ -27,5 +27,4 @@ Lancia `pytest` dalla radice del repository: i test importano gli script di
 
 ## markdownlint segnala errori
 
-`npx markdownlint-cli2 "**/*.md"` usa la configurazione del repository: correggi
-come indicato.
+`make lint-md` usa la configurazione del repository: correggi come indicato.

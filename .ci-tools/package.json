@@ -1,0 +1,12 @@
+{
+  "name": "hp-probook-ci-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tooling di verifica dei Markdown del repository",
+  "devDependencies": {
+    "markdownlint-cli2": "0.24.2"
+  },
+  "overrides": {
+    "katex": "0.19.1"
+  }
+}

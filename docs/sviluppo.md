@@ -26,7 +26,7 @@ Risultato: `build/coreboot.rom` (non va committata, il `.gitignore` la esclude).
 ## Controlli del repository
 
 ```bash
-npx markdownlint-cli2 "**/*.md"
+make lint-md
 ```
 
 La CI esegue anche lychee (link) e gitleaks (segreti).
