@@ -1,7 +1,8 @@
 # HP ProBook 640 G1 Open-Source Firmware & Hardware Porting Project
 
-<!-- markdownlint-disable-next-line MD013 -->
-![CI](https://github.com/LightYagami28/hp-probook-640-g1-opensource/actions/workflows/ci.yml/badge.svg) ![License](https://img.shields.io/github/license/LightYagami28/hp-probook-640-g1-opensource) ![Stars](https://img.shields.io/github/stars/LightYagami28/hp-probook-640-g1-opensource)
+![CI](https://github.com/LightYagami28/hp-probook-640-g1-opensource/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/github/license/LightYagami28/hp-probook-640-g1-opensource)
+![Stars](https://img.shields.io/github/stars/LightYagami28/hp-probook-640-g1-opensource)
 
 Progetto completo di reverse engineering, dump hardware/firmware e porting
 open-source a **Coreboot** per il portatile **HP ProBook 640 G1**.
@@ -136,7 +137,8 @@ i limiti in [`SPEC.md`](SPEC.md).
 ```bash
 git clone https://review.coreboot.org/coreboot.git
 cd coreboot
-git checkout 26.09   # ultima release verificata il 2026-10-31
+git checkout 26.09   # ultima release verificata il 2026-11-23
+git submodule update --init --checkout
 ```
 
 ### 2. Installare il port della mainboard
@@ -205,7 +207,7 @@ distribuiti qui:
 - [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md),
   [`CHANGELOG.md`](CHANGELOG.md).
 
-## 🧰 Versioni di riferimento (2026-10-31)
+## 🧰 Versioni di riferimento (2026-11-23)
 
 coreboot 26.09 (crossgcc: GCC 15.2.0, binutils 2.46.1, IASL 20251212), flashrom
 1.8.0. CI: markdownlint, lychee, gitleaks con azioni fissate per SHA.
