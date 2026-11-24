@@ -25,10 +25,11 @@ Vedi [`docs/sicurezza.md`](docs/sicurezza.md) e
 ## Avvio processi
 
 Tutti gli script avviano processi da un unico punto, in
-`exec_command.py::spawn`: `posix_spawn` senza shell, con
-argomenti separati e lista di quattro eseguibili assoluti
-ammessi (`python3`, `gdb`, `pkill`, `systemctl`). Qualunque
-altro percorso viene rifiutato prima della chiamata.
+`subsystems/02-fingerprint-vfs495/scripts/exec_command.py::spawn`:
+`posix_spawn` senza shell, con argomenti separati e whitelist di
+quattro eseguibili assoluti ammessi (`/usr/bin/python3`,
+`/usr/bin/gdb`, `/usr/bin/pkill`, `/usr/bin/systemctl`).
+Qualunque altro percorso viene rifiutato prima della chiamata.
 
 ## Stato analisi statica (2026-11-21)
 
