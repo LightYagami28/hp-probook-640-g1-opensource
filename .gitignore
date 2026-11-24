@@ -8,6 +8,9 @@ dump*.bin
 # Test e ambienti locali
 .venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.scannerwork/
 .coverage
 coverage.xml
 __pycache__/

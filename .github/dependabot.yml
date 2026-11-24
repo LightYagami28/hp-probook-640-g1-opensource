@@ -18,3 +18,18 @@ updates:
       major:
         update-types:
           - major
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 20
+    commit-message:
+      prefix: dipendenze(pip)
+    groups:
+      minori-e-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major

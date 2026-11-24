@@ -2,7 +2,7 @@
 
 venv:
 	python3 -m venv .venv
-	.venv/bin/pip install pytest pytest-cov bandit pip-audit ruff mypy shellcheck-py
+	.venv/bin/pip install -r requirements-dev.txt
 
 test:
 	.venv/bin/pytest --cov=subsystems/02-fingerprint-vfs495/scripts --cov-report=term-missing
