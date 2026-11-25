@@ -776,3 +776,47 @@ def test_spawn_uses_posix_spawn_without_dynamic_exec(monkeypatch):
         (1, 1, module.os.devnull, 1, 0),
         (1, 2, module.os.devnull, 1, 0),
     ]
+
+
+@pytest.mark.skipif(not hasattr(os, "posix_spawn"), reason="serve posix_spawn")
+def test_child_process_wait_and_terminate_from_two_threads(monkeypatch):
+    """wait() in un thread e terminate()/poll() in un altro: un solo waitpid, nessun ECHILD."""
+    import threading
+
+    module = load_script("exec_command.py", "vfs495_exec_command_race")
+    monkeypatch.setattr(module, "EXECUTABILI_CONSENTITI", frozenset({sys.executable}))
+    reaped = []
+    real_waitpid = os.waitpid
+
+    def counting_waitpid(pid, flags):
+        done, status = real_waitpid(pid, flags)
+        if done:
+            reaped.append(pid)
+        return done, status
+
+    monkeypatch.setattr(module.os, "waitpid", counting_waitpid)
+    for _ in range(5):
+        proc = module.spawn([sys.executable, "-c", "import time; time.sleep(30)"])
+        result = {}
+        waiter = threading.Thread(target=lambda p=proc, r=result: r.update(code=p.wait()))
+        waiter.start()
+        time.sleep(0.05)
+        assert proc.poll() is None
+        proc.terminate()
+        waiter.join(10)
+        assert not waiter.is_alive()
+        assert result["code"] == proc.poll() == -15
+        proc.terminate()  # già raccolto: nessun segnale, nessun errore
+    assert len(reaped) == len(set(reaped)) == 5
+
+
+@pytest.mark.skipif(not hasattr(os, "posix_spawn"), reason="serve posix_spawn")
+def test_child_process_wait_timeout_kills(monkeypatch):
+    module = load_script("exec_command.py", "vfs495_exec_command_timeout")
+    monkeypatch.setattr(module, "EXECUTABILI_CONSENTITI", frozenset({sys.executable}))
+    proc = module.spawn([sys.executable, "-c", "import time; time.sleep(30)"])
+    with pytest.raises(module.CommandTimeout):
+        proc.wait(0.1)
+    assert proc.poll() == -15
+    quick = module.spawn([sys.executable, "-c", "raise SystemExit(3)"])
+    assert quick.wait(10) == 3
