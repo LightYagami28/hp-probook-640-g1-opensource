@@ -41,14 +41,12 @@ class CommandTimeout(Exception):
 
 @dataclass
 class ChildProcess:
-    """Processo avviato da ``spawn``, con interfaccia minima di attesa.
-
-    ``wait``, ``poll`` e ``terminate`` possono arrivare da thread diversi (il bridge
-    attende la cattura in un thread e la annulla da quello degli eventi D-Bus).
-    Il pid viene raccolto con ``waitpid`` una sola volta e sempre sotto ``_lock``:
-    i segnali partono solo finché il processo non è stato raccolto, quindi non
-    possono colpire un pid riassegnato e nessun thread riceve ``ECHILD``.
-    """
+    """Processo avviato da ``spawn``, con interfaccia minima di attesa."""
+    # wait, poll e terminate possono arrivare da thread diversi (il bridge
+    # attende la cattura in un thread e la annulla da quello degli eventi D-Bus).
+    # Il pid viene raccolto con waitpid una sola volta e sempre sotto _lock:
+    # i segnali partono solo finché il processo non è stato raccolto, quindi non
+    # possono colpire un pid riassegnato e nessun thread riceve ECHILD.
 
     pid: int
     _status: int | None = None
