@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import os
 import signal
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final, Self
 
 DEVNULL = object()
@@ -41,9 +42,15 @@ class CommandTimeout(Exception):
 @dataclass
 class ChildProcess:
     """Processo avviato da ``spawn``, con interfaccia minima di attesa."""
+    # wait, poll e terminate possono arrivare da thread diversi (il bridge
+    # attende la cattura in un thread e la annulla da quello degli eventi D-Bus).
+    # Il pid viene raccolto con waitpid una sola volta e sempre sotto _lock:
+    # i segnali partono solo finché il processo non è stato raccolto, quindi non
+    # possono colpire un pid riassegnato e nessun thread riceve ECHILD.
 
     pid: int
     _status: int | None = None
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def __enter__(self) -> Self:
         """Restituisce il processo come context manager, pronto per l'attesa."""
@@ -51,29 +58,67 @@ class ChildProcess:
 
     def __exit__(self, *_exc: object) -> None:
         """Attende il processo alla chiusura del context manager."""
-        if self._status is None:
-            self.wait()
+        self.wait()
 
-    def poll(self) -> int | None:
-        """Restituisce il codice di uscita se il processo è terminato."""
+    def _reap(self) -> bool:
+        """Raccoglie il processo se è uscito; va chiamato con ``_lock`` preso."""
         if self._status is None:
             done, status = os.waitpid(self.pid, os.WNOHANG)
             if done:
                 self._status = status
-        return None if self._status is None else os.waitstatus_to_exitcode(self._status)
+        return self._status is not None
+
+    def _signal_alive(self, sig: int, children: bool = False) -> bool:
+        """Invia ``sig`` solo se il processo non è ancora stato raccolto."""
+        with self._lock:
+            if self._reap():
+                return False
+            if children:
+                for child in _children(self.pid):
+                    _signal(child, sig)
+            return _signal(self.pid, sig)
+
+    def _wait_until(self, deadline: float | None) -> bool:
+        """Attende l'uscita fino a ``deadline``; restituisce True se è uscito."""
+        while True:
+            with self._lock:
+                if self._reap():
+                    return True
+            if deadline is not None and time.monotonic() >= deadline:
+                return False
+            time.sleep(0.02)
+
+    def _exit_code(self) -> int:
+        """Codice di uscita del processo già raccolto."""
+        if self._status is None:
+            raise RuntimeError("processo non ancora raccolto")
+        return os.waitstatus_to_exitcode(self._status)
+
+    def poll(self) -> int | None:
+        """Restituisce il codice di uscita se il processo è terminato."""
+        with self._lock:
+            if not self._reap():
+                return None
+        return self._exit_code()
 
     def wait(self, timeout: float | None = None) -> int:
         """Attende il processo e ne restituisce il codice di uscita."""
-        if self._status is None:
-            self._status = _wait(self.pid, timeout)
-            if timeout is not None and os.waitstatus_to_exitcode(self._status) < 0:
-                raise CommandTimeout([str(self.pid)], timeout)
-        return os.waitstatus_to_exitcode(self._status)
+        deadline = None if timeout is None else time.monotonic() + timeout
+        if not self._wait_until(deadline):
+            self.terminate()
+            code = self._exit_code()
+            if code < 0:
+                raise CommandTimeout([str(self.pid)], timeout or 0)
+            return code
+        return self._exit_code()
 
     def terminate(self) -> None:
         """Termina il processo e i figli, conservandone lo stato di uscita."""
-        if self._status is None:
-            self._status = _terminate(self.pid)
+        if self._signal_alive(signal.SIGTERM, children=True) and not self._wait_until(
+            time.monotonic() + 2
+        ):
+            self._signal_alive(signal.SIGKILL)
+        self._wait_until(None)
 
 
 def _signal(pid: int, sig: int) -> bool:
@@ -85,21 +130,6 @@ def _signal(pid: int, sig: int) -> bool:
     return True
 
 
-def _wait(pid: int, timeout: float | None) -> int:
-    """Attende ``pid``, terminandolo allo scadere del timeout."""
-    if timeout is None:
-        _, status = os.waitpid(pid, 0)
-        return status
-    deadline = time.monotonic() + timeout
-    while True:
-        done, status = os.waitpid(pid, os.WNOHANG)
-        if done:
-            return status
-        if time.monotonic() >= deadline:
-            return _terminate(pid)
-        time.sleep(0.02)
-
-
 def _children(pid: int) -> list[int]:
     """Restituisce i figli diretti di ``pid`` leggendoli da /proc."""
     try:
@@ -107,22 +137,6 @@ def _children(pid: int) -> list[int]:
             return [int(value) for value in handle.read().split() if value.isdigit()]
     except (OSError, ValueError):
         return []
-
-
-def _terminate(pid: int) -> int:
-    """Termina il processo e i suoi figli diretti, poi restituisce lo stato."""
-    for child in _children(pid):
-        _signal(child, signal.SIGTERM)
-    _signal(pid, signal.SIGTERM)
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        done, status = os.waitpid(pid, os.WNOHANG)
-        if done:
-            return status
-        time.sleep(0.02)
-    _signal(pid, signal.SIGKILL)
-    _, status = os.waitpid(pid, 0)
-    return status
 
 
 def _validate_executable(argv: list[str]) -> str:
